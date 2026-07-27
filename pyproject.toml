@@ -26,6 +26,6 @@ dev = [
 include = ["app*"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --basetemp=.pytest-tmp"
+addopts = "-ra -p no:cacheprovider"
 asyncio_mode = "auto"
 testpaths = ["tests"]

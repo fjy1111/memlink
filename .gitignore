@@ -1,9 +1,12 @@
 # Python
 __pycache__/
+**pycache**/
 *.py[cod]
+*.pyc
 *.pyo
 .pytest_cache/
 .pytest-tmp/
+.pytest-*/
 .coverage
 htmlcov/
 
