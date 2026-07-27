@@ -32,3 +32,11 @@ benchmarks/results/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Runtime shared memory
+data/memory/*
+!data/memory/.gitkeep
+
+# Runtime semantic states
+data/states/*
+!data/states/.gitkeep
