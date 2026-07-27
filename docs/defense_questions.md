@@ -1,0 +1,81 @@
+# 答辩问题与参考回答
+
+## 1. 为什么不是普通 Prompt 多 Agent？
+
+四个角色有不同 Pydantic 契约、capability、action、工具权限和输出验证；structured 还包含 Registry、证据链、状态 ID、结果引用和协议字节统计，不只是串联 Prompt。
+
+## 2. 四个 Agent 有什么真实区别？
+
+Planner 只规划；Retriever 只检索和排序证据；Executor 只能运行注册的确定性工具；Reviewer 校验证据、能力完成和执行状态，并决定是否保存记忆。
+
+## 3. structured 模式为什么更高效？
+
+不能笼统说所有指标更高效。当前结果中 JSON 字节较 text 低5.13%，result_ref 明显减少完整结果重复传输；但字符、Token、总负载和耗时更高。优势是边界、追踪和可选择传输，仍需继续优化。
+
+## 4. MessagePack 有什么作用？
+
+它把同一 AgentMessage 紧凑编码为二进制，并与 JSON 同时测量。当前完整 structured 的 MessagePack 均值6865.533 B，小于其 JSON 7621.433 B。
+
+## 5. SemanticState 是不是把 embedding 转成文本？
+
+不是。向量保存在 `.npy`，消息只传 state ID。页面只显示元数据，向量不会进入 Prompt 或协议参数。
+
+## 6. 向量如何传递和使用？
+
+StateStore 保存向量并返回 UUID；消息携带 UUID；下游按需加载、校验维度/dtype/哈希，再用于共享记忆余弦相似度检索。
+
+## 7. 共享记忆与聊天历史有什么区别？
+
+聊天历史属于当前会话；共享记忆是经 Reviewer 或完成状态验证、可跨任务查询、带证据、置信度和使用次数的长期记录。
+
+## 8. 如何证明记忆被复用？
+
+连续任务使用相同 task topic。结果返回 reused memory IDs，数据库 usage count 增长，原始指标记录查询、命中和重复检索。关闭记忆后这些值和数据库增长均为0。
+
+## 9. 如何保证两种模式公平比较？
+
+使用同一任务文件、顺序、Fake 客户端、seed、temperature、轮数、超时和重试配置；每种配置从独立空数据库和状态目录开始。
+
+## 10. 为什么使用 Fake LLM 做 Benchmark？
+
+它消除费用、网络波动和服务版本变化，确保离线可复现。真实 OpenAI-compatible 入口保留，但不是自动测试条件。
+
+## 11. 是否支持 DeepSeek 和阿里百炼？
+
+项目提供厂商无关的 OpenAI-compatible 适配层，但完整流程要求所配置端点同时满足 `chat/completions` 和 `embeddings` 响应结构。DeepSeek、百炼等具体厂商尚未做真实网络验证，因此只能表述为“可按实际兼容端点配置”，不能声称已经完成厂商适配实测。密钥只来自环境变量，页面不输入密钥，pytest 不调用真实服务。
+
+## 12. 为什么不用 Redis 或 Milvus？
+
+当前目标是单机可演示、可复现 MVP。SQLite 和 NumPy 足以验证机制，依赖更少，更适合 Windows/openEuler。大规模场景可通过现有 Store 接口替换。
+
+## 13. 为什么使用 SQLite？
+
+它跨平台、零服务部署、支持事务和参数化查询，适合当前共享记忆元数据规模，也便于每个 Benchmark 实验创建独立临时数据库。
+
+## 14. result_ref 的价值是什么？
+
+它用短引用代替计划、证据、执行和审查对象。消融中关闭引用后完整字段平均7次，JSON 较完整 structured 增加88.47%。
+
+## 15. structured 模式有哪些额外开销？
+
+四条 handshake、协议字段、Registry 校验、MessagePack 编码、SQLite 多策略查询、状态文件和哈希校验。当前 P50/P95 高于 text，报告已如实记录。
+
+## 16. openEuler 适配做了什么？
+
+脚本使用 Bash 严格模式、LF、相对根目录、Linux `.venv`、UTF-8、权限检查，并覆盖 pytest、Demo、API、UI、Benchmark 和环境采集。实机验证仍待完成。
+
+## 17. 项目与操作系统赛道有什么关系？
+
+项目关注协作基础设施的通信表示、状态存储、持久化、资源生命周期、跨平台进程和文件管理，并通过可复现实验量化系统开销，而不是只展示模型内容。
+
+## 18. 如何保证工具执行安全？
+
+Executor 只能调用 ToolRegistry 中允许角色为 executor 的两个确定性工具。没有 Shell、Python eval 或任意命令入口；页面也不执行 Shell。
+
+## 19. 当前项目最大局限是什么？
+
+单机进程内结果引用和 TaskStore 不适合分布式恢复；真实模型和 openEuler 尚需实测；当前 structured 固定开销在轻量 Fake 任务中较明显。
+
+## 20. 后续如何扩展为分布式系统？
+
+保持 Agent、Registry、StateStore、MemoryStore 接口，逐步替换为带认证的服务端注册、对象存储、持久结果引用和分布式记忆后端，并增加幂等、租约、追踪和一致性策略。

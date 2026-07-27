@@ -1,0 +1,112 @@
+# MemLink 第四阶段测试报告
+
+## 1. 测试环境
+
+- 日期：2026-07-27；
+- 系统：Windows-10-10.0.26200-SP0，AMD64；
+- 解释器：`D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe`；
+- Python：3.11.15，Anaconda 构建；
+- 默认模型：Fake LLM、Fake Embedding；
+- 网络/付费 API：未使用。
+
+## 2. 测试范围
+
+覆盖领域模型、四 Agent 契约、Registry、协议序列化、LLM/Embedding 适配器、StateStore、SQLite MemoryStore、双模式编排、API、CLI、Benchmark、消融、稳定性、Linux 脚本和 Streamlit 展示层。
+
+## 3. 单元测试
+
+验证 Pydantic 字段约束、唯一 ID、token 估算、Fake 模型确定性、MessagePack round trip、状态哈希、余弦检索、记忆去重、P50/P95 和总体标准差。
+
+## 4. 集成测试
+
+验证四 Agent 顺序执行、structured capability 路由、真实跨任务记忆复用、SemanticState 文件与 ID 传递、任务结果持久查询和 Reviewer 审查字段。
+
+## 5. API 测试
+
+pytest 使用 FastAPI TestClient 覆盖 health、text/structured POST、GET 查询、404和422。第四阶段另启动真实 Uvicorn：
+
+- `GET /health`：200；
+- `POST /api/v1/tasks/run`：text 与 structured 均为201；
+- `GET /api/v1/tasks/{task_id}`：两个任务均为200、状态 completed；
+- 验证后8000端口和项目 Uvicorn 进程：0。
+
+## 6. CLI 测试
+
+pytest 在隔离目录中使用当前解释器启动 text/structured Demo，并检查 UTF-8 输出、轨迹和指标。第四阶段手工复验：
+
+- text：成功，4条消息，MessagePack 0；
+- structured：成功，9条协议消息，3次/384 B SemanticState。
+
+## 7. Benchmark 测试
+
+覆盖配置矩阵、实验选择、数据库/状态目录隔离、JSONL、UTF-8-SIG CSV、汇总、环境脱敏、失败记录和冷启动导入。
+
+阶段三正式结果为300/300成功。第四阶段额外在系统临时目录执行1轮五配置最小验证，共30/30成功，结束后目录自动清理，未覆盖正式结果。
+
+## 8. 消融开关
+
+- 无记忆：查询、命中和 SQLite 增长为0；
+- 无 SemanticState：传递和状态文件为0；
+- 无 result_ref：引用为0，完整结果传输大于0且序列化字节增加；
+- text：协议消息和 MessagePack 为0。
+
+## 9. 稳定性
+
+阶段三完整 structured 连续60个任务全部成功，无异常和重试；数据库句柄释放、临时目录清理成功。
+
+## 10. Streamlit
+
+4项 UI 测试验证真实编排、Agent 卡片、记忆、状态元数据、Reviewer 字段、Benchmark 缺失处理和页面 Fake 任务。
+
+实际服务验证：
+
+- `python -m streamlit run app/ui/streamlit_app.py` 由固定脚本启动；
+- `/_stcore/health` 返回200；
+- 验证后8501监听和项目 Streamlit 进程为0。
+
+## 11. Windows 最终结果
+
+```text
+55 passed, 1 warning
+```
+
+`pip check`：
+
+```text
+No broken requirements found.
+```
+
+## 12. openEuler 结果
+
+待 openEuler 24.03-LTS-SP3 实机验证。当前只完成 Bash/LF/相对路径的 Windows 静态测试，不能把 Windows 结果写成 openEuler 通过。
+
+## 13. warning
+
+唯一 warning：
+
+```text
+StarletteDeprecationWarning:
+Using httpx with starlette.testclient is deprecated; install httpx2 instead.
+```
+
+根据项目约束未安装 `httpx2`，也未大范围升级 FastAPI、Starlette、pytest 或 httpx。warning 不影响当前55项测试。
+
+## 14. 已知问题
+
+- openEuler、真实模型和浏览器人工交互尚需外部验证；
+- 项目中存在本轮开始前已有的 Windows `.venv`，本阶段未使用、创建或删除；
+- Streamlit 是比赛演示界面，不含认证和多人隔离；
+- structured 当前部分性能指标差于 text。
+
+## 15. 复现命令
+
+```powershell
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pip check
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cli run --rounds 1
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m streamlit run app/ui/streamlit_app.py
+```
+
+最小 Benchmark 如需保留阶段三正式结果，应使用独立 `--results-dir`。

@@ -14,10 +14,18 @@ htmlcov/
 .venv/
 venv/
 .env
+.streamlit/secrets.toml
 
 # Runtime data
 data/metrics/*.json
 !data/metrics/.gitkeep
+data/states/*.npy
+data/states/*.json
+!data/states/.gitkeep
+data/memory/*.db
+data/memory/*.db-*
+!data/memory/.gitkeep
+benchmarks/results/
 
 # IDE and OS
 .idea/
