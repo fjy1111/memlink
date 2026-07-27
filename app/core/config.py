@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -25,10 +25,31 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     metrics_dir: Path = Path("data") / "metrics"
+    state_dir: Path = Path("data") / "states"
+    memory_db_path: Path = Path("data") / "memory" / "memlink.db"
+    enable_shared_memory: bool = True
+    enable_semantic_state: bool = True
+    enable_result_reference: bool = True
 
-    @field_validator("metrics_dir")
+    llm_backend: str = "fake"
+    llm_api_key: str = Field(default="", repr=False)
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_timeout_seconds: float = Field(default=60.0, gt=0)
+    llm_max_retries: int = Field(default=2, ge=0, le=10)
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+
+    embedding_backend: str = "fake"
+    embedding_api_key: str = Field(default="", repr=False)
+    embedding_base_url: str = ""
+    embedding_model: str = ""
+    embedding_dimensions: int = Field(default=32, gt=0, le=4096)
+    embedding_timeout_seconds: float = Field(default=60.0, gt=0)
+    embedding_max_retries: int = Field(default=2, ge=0, le=10)
+
+    @field_validator("metrics_dir", "state_dir", "memory_db_path")
     @classmethod
-    def resolve_metrics_dir(cls, value: Path) -> Path:
+    def resolve_project_path(cls, value: Path) -> Path:
         """Resolve relative paths against the repository, not the shell cwd."""
 
         return value if value.is_absolute() else PROJECT_ROOT / value
@@ -42,6 +63,17 @@ class Settings(BaseSettings):
         allowed = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}
         if normalized not in allowed:
             raise ValueError(f"log_level must be one of {sorted(allowed)}")
+        return normalized
+
+    @field_validator("llm_backend", "embedding_backend")
+    @classmethod
+    def validate_backend(cls, value: str) -> str:
+        """Restrict adapters to offline fake or OpenAI-compatible HTTP."""
+
+        normalized = value.lower()
+        allowed = {"fake", "openai_compatible"}
+        if normalized not in allowed:
+            raise ValueError(f"backend must be one of {sorted(allowed)}")
         return normalized
 
 

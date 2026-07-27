@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from app.api.routes import router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
-from app.runtime.orchestrator import TextTaskOrchestrator
+from app.runtime.orchestrator import TaskOrchestrator
 
 logger = get_logger(__name__)
 
@@ -26,6 +26,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         active_settings.metrics_dir.mkdir(parents=True, exist_ok=True)
+        active_settings.state_dir.mkdir(parents=True, exist_ok=True)
+        active_settings.memory_db_path.parent.mkdir(parents=True, exist_ok=True)
+        application.state.orchestrator = TaskOrchestrator.from_settings(
+            active_settings
+        )
         logger.info(
             "Starting %s %s in %s mode",
             active_settings.app_name,
@@ -38,13 +43,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(
         title=active_settings.app_name,
         version=active_settings.app_version,
-        description="MemLink stage-one text-mode multi-agent MVP",
+        description="MemLink dual-mode multi-agent collaboration infrastructure",
         lifespan=lifespan,
     )
     application.state.settings = active_settings
-    application.state.orchestrator = TextTaskOrchestrator(
-        metrics_dir=active_settings.metrics_dir
-    )
+    application.state.orchestrator = None
     application.include_router(router)
     return application
 

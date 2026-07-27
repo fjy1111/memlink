@@ -7,20 +7,20 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.models.domain import HealthResponse, TaskCreate, TaskRecord, TaskResult
-from app.runtime.orchestrator import OrchestrationError, TextTaskOrchestrator
+from app.runtime.orchestrator import OrchestrationError, TaskOrchestrator
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-def get_orchestrator(request: Request) -> TextTaskOrchestrator:
+def get_orchestrator(request: Request) -> TaskOrchestrator:
     """Return the application-scoped orchestrator."""
 
     return request.app.state.orchestrator
 
 
 OrchestratorDependency = Annotated[
-    TextTaskOrchestrator, Depends(get_orchestrator)
+    TaskOrchestrator, Depends(get_orchestrator)
 ]
 
 
