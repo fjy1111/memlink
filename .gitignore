@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.pytest-tmp/
+.coverage
+htmlcov/
+
+# Virtual environments and secrets
+.venv/
+venv/
+.env
+
+# Runtime data
+data/metrics/*.json
+!data/metrics/.gitkeep
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
