@@ -25,6 +25,8 @@ def client(metrics_dir: Path) -> Iterator[TestClient]:
         environment="test",
         log_level="WARNING",
         metrics_dir=metrics_dir,
+        state_dir=metrics_dir.parent / "states",
+        memory_db_path=metrics_dir.parent / "memory" / "test.db",
     )
     with TestClient(create_app(settings)) as test_client:
         yield test_client
