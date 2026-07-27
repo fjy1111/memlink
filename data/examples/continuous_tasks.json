@@ -1,0 +1,44 @@
+{
+  "groups": {
+    "rag": {
+      "name": "企业 RAG 服务故障",
+      "tasks": [
+        {
+          "title": "RAG 服务响应变慢",
+          "prompt": "企业 RAG 服务响应时间明显升高，请区分检索、生成和依赖服务阶段并给出排查与止损方案。",
+          "task_topic": "enterprise-rag"
+        },
+        {
+          "title": "高并发下 RAG 请求超时",
+          "prompt": "同一 RAG 服务在高并发下频繁超时，请复用已有故障经验，检查容量、排队和依赖超时。",
+          "task_topic": "enterprise-rag"
+        },
+        {
+          "title": "生成阶段延迟升高",
+          "prompt": "RAG 检索耗时正常，但生成阶段延迟持续升高，请复用前序证据和策略定位原因。",
+          "task_topic": "enterprise-rag"
+        }
+      ]
+    },
+    "api": {
+      "name": "企业 API 服务故障",
+      "tasks": [
+        {
+          "title": "API 频繁返回 500",
+          "prompt": "生产 API 频繁返回 HTTP 500，请分析变更、依赖、日志和资源指标。",
+          "task_topic": "enterprise-api"
+        },
+        {
+          "title": "数据库连接池耗尽",
+          "prompt": "API 故障进一步表现为数据库连接池耗尽，请复用前序排查经验分析等待和泄漏。",
+          "task_topic": "enterprise-api"
+        },
+        {
+          "title": "异步任务积压",
+          "prompt": "接口恢复后异步任务仍持续积压，请复用同组记忆检查生产消费速率与失败重试。",
+          "task_topic": "enterprise-api"
+        }
+      ]
+    }
+  }
+}
