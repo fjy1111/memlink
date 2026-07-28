@@ -32,12 +32,13 @@ class Settings(BaseSettings):
     enable_result_reference: bool = True
 
     llm_backend: str = "fake"
-    llm_api_key: str = Field(default="", repr=False)
-    llm_base_url: str = ""
-    llm_model: str = ""
+    deepseek_api_key: str = Field(default="", repr=False)
+    deepseek_base_url: str = ""
+    deepseek_model: str = ""
     llm_timeout_seconds: float = Field(default=60.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0, le=10)
-    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    llm_max_tokens: int = Field(default=1500, gt=0, le=8192)
 
     embedding_backend: str = "fake"
     embedding_api_key: str = Field(default="", repr=False)
@@ -46,6 +47,22 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=32, gt=0, le=4096)
     embedding_timeout_seconds: float = Field(default=60.0, gt=0)
     embedding_max_retries: int = Field(default=2, ge=0, le=10)
+
+    def deepseek_is_configured(self) -> bool:
+        """Return whether all DeepSeek values are non-placeholder settings."""
+
+        api_key = self.deepseek_api_key.strip()
+        base_url = self.deepseek_base_url.strip()
+        model = self.deepseek_model.strip()
+        return (
+            bool(api_key)
+            and api_key != "replace-me"
+            and base_url.startswith(("https://", "http://"))
+            and not base_url.startswith("https://replace-with-")
+            and not base_url.startswith("http://replace-with-")
+            and bool(model)
+            and not model.startswith("replace-with-")
+        )
 
     @field_validator("metrics_dir", "state_dir", "memory_db_path")
     @classmethod
@@ -65,15 +82,28 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {sorted(allowed)}")
         return normalized
 
-    @field_validator("llm_backend", "embedding_backend")
+    @field_validator("llm_backend")
     @classmethod
-    def validate_backend(cls, value: str) -> str:
-        """Restrict adapters to offline fake or OpenAI-compatible HTTP."""
+    def validate_llm_backend(cls, value: str) -> str:
+        """Restrict language models to the offline or DeepSeek adapter."""
+
+        normalized = value.lower()
+        allowed = {"fake", "deepseek"}
+        if normalized not in allowed:
+            raise ValueError(f"llm_backend must be one of {sorted(allowed)}")
+        return normalized
+
+    @field_validator("embedding_backend")
+    @classmethod
+    def validate_embedding_backend(cls, value: str) -> str:
+        """Keep the existing optional OpenAI-compatible embedding adapter."""
 
         normalized = value.lower()
         allowed = {"fake", "openai_compatible"}
         if normalized not in allowed:
-            raise ValueError(f"backend must be one of {sorted(allowed)}")
+            raise ValueError(
+                f"embedding_backend must be one of {sorted(allowed)}"
+            )
         return normalized
 
 

@@ -146,8 +146,8 @@ def create_embedding_client(settings: Settings) -> EmbeddingClient:
     if settings.embedding_backend == "fake":
         return FakeEmbeddingClient(settings.embedding_dimensions)
     return OpenAICompatibleEmbeddingClient(
-        api_key=settings.embedding_api_key or settings.llm_api_key,
-        base_url=settings.embedding_base_url or settings.llm_base_url,
+        api_key=settings.embedding_api_key,
+        base_url=settings.embedding_base_url,
         model=settings.embedding_model,
         dimensions=settings.embedding_dimensions,
         timeout_seconds=settings.embedding_timeout_seconds,

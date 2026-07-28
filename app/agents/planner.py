@@ -13,6 +13,12 @@ class PlannerAgent(BaseAgent):
         "You are Planner Agent. Decompose goals and dependencies only. "
         "Never execute tools or claim that an action has already run."
     )
+    structured_system_prompt = (
+        system_prompt
+        + " In structured mode, output only the json object defined by the "
+        "appended TaskPlan Schema and complete example; never output Markdown "
+        "or explanatory text."
+    )
     capabilities = ("task_planning", "risk_analysis")
     accepted_actions = (MessageAction.HANDSHAKE, MessageAction.PLAN_TASK)
     input_model_name = PlannerInput.__name__
@@ -39,10 +45,11 @@ class PlannerAgent(BaseAgent):
 
         try:
             generated = await self._llm.generate(
-                system_prompt=self.system_prompt,
+                system_prompt=self.structured_system_prompt,
                 user_prompt=planner_input.model_dump_json(),
                 response_model=TaskPlan,
                 context={
+                    "role": "planner",
                     "original_task": planner_input.original_task,
                     "memory_summaries": planner_input.reusable_memory_summaries,
                 },

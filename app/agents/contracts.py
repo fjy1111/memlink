@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PlannerInput(BaseModel):
@@ -17,6 +17,30 @@ class PlannerInput(BaseModel):
 
 class TaskPlan(BaseModel):
     """Validated decomposition produced by the Planner."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "goal": "定位并缓解 API 延迟故障",
+                    "steps": [
+                        "检索故障窗口内的指标和变更证据",
+                        "基于证据执行安全诊断",
+                        "审查证据覆盖和恢复标准",
+                    ],
+                    "dependencies": {"2": ["1"], "3": ["1", "2"]},
+                    "assigned_capability": {
+                        "1": "knowledge_retrieval",
+                        "2": "safe_execution",
+                        "3": "evidence_review",
+                    },
+                    "risks": ["证据不足可能导致误判"],
+                    "success_criteria": ["结论关联有效 evidence_id"],
+                }
+            ]
+        }
+    )
 
     goal: str
     steps: list[str] = Field(min_length=1)
@@ -59,6 +83,30 @@ class EvidenceItem(BaseModel):
 class EvidenceBundle(BaseModel):
     """Evidence selected by Retriever without forming the final answer."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "query": "API 延迟升高",
+                    "evidence_items": [
+                        {
+                            "evidence_id": "evidence-1",
+                            "content": "发布后 P95 延迟从 200ms 升至 900ms",
+                            "source_type": "knowledge",
+                            "relevance_score": 0.95,
+                        }
+                    ],
+                    "evidence_ids": ["evidence-1"],
+                    "source_types": ["knowledge"],
+                    "relevance_scores": [0.95],
+                    "summary": "发布变更与延迟升高存在时间相关性",
+                    "confidence": 0.9,
+                }
+            ]
+        }
+    )
+
     query: str
     evidence_items: list[EvidenceItem] = Field(min_length=1)
     evidence_ids: list[str] = Field(min_length=1)
@@ -92,6 +140,23 @@ class ExecutorInput(BaseModel):
 class ExecutionResult(BaseModel):
     """Outcome of one allow-listed deterministic action."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "action": "analyze_incident",
+                    "success": True,
+                    "result_summary": "建议执行可回滚的版本回退并观察 P95",
+                    "result_ref": None,
+                    "evidence_ids": ["evidence-1"],
+                    "error_code": None,
+                    "retryable": False,
+                }
+            ]
+        }
+    )
+
     action: str
     success: bool
     result_summary: str
@@ -113,6 +178,23 @@ class ReviewerInput(BaseModel):
 
 class ReviewResult(BaseModel):
     """Evidence-aware final decision produced by Reviewer."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "passed": True,
+                    "final_answer": "回退最近版本并验证 P95 和错误率恢复。",
+                    "missing_evidence": [],
+                    "contradictions": [],
+                    "recommendations": ["保留回退前后的监控对照"],
+                    "confidence": 0.9,
+                    "should_store_memory": True,
+                }
+            ]
+        }
+    )
 
     passed: bool
     final_answer: str

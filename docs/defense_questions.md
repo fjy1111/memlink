@@ -38,11 +38,15 @@ StateStore 保存向量并返回 UUID；消息携带 UUID；下游按需加载�
 
 ## 10. 为什么使用 Fake LLM 做 Benchmark？
 
-它消除费用、网络波动和服务版本变化，确保离线可复现。真实 OpenAI-compatible 入口保留，但不是自动测试条件。
+它消除费用、网络波动和服务版本变化，确保离线可复现。DeepSeek 入口仅用于
+人工真实模型演示，不是自动测试或 Benchmark 条件。
 
 ## 11. 是否支持 DeepSeek 和阿里百炼？
 
-项目提供厂商无关的 OpenAI-compatible 适配层，但完整流程要求所配置端点同时满足 `chat/completions` 和 `embeddings` 响应结构。DeepSeek、百炼等具体厂商尚未做真实网络验证，因此只能表述为“可按实际兼容端点配置”，不能声称已经完成厂商适配实测。密钥只来自环境变量，页面不输入密钥，pytest 不调用真实服务。
+项目当前只接入 DeepSeek Chat Completions，不提供多供应商切换。DeepSeek
+仍待维护者使用本地 `.env` 做真实网络验证；SemanticState 在 DeepSeek 演示中
+使用可复现 Fake Embedding。密钥不进入页面输入、日志或结果，pytest 使用
+MockTransport，不调用真实服务。
 
 ## 12. 为什么不用 Redis 或 Milvus？
 

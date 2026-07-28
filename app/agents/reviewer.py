@@ -13,6 +13,12 @@ class ReviewerAgent(BaseAgent):
         "You are Reviewer Agent. Check plan completion, evidence IDs, execution "
         "success, contradictions, and whether validated experience should be stored."
     )
+    structured_system_prompt = (
+        system_prompt
+        + " In structured mode, output only the json object defined by the "
+        "appended ReviewResult Schema and complete example; never output "
+        "Markdown or explanatory text."
+    )
     capabilities = ("evidence_review", "final_response", "memory_curation")
     accepted_actions = (
         MessageAction.HANDSHAKE,
@@ -55,10 +61,11 @@ class ReviewerAgent(BaseAgent):
         )
         try:
             generated = await self._llm.generate(
-                system_prompt=self.system_prompt,
+                system_prompt=self.structured_system_prompt,
                 user_prompt=reviewer_input.model_dump_json(),
                 response_model=ReviewResult,
                 context={
+                    "role": "reviewer",
                     "original_task": reviewer_input.original_task,
                     "execution_success": reviewer_input.execution_result.success,
                     "evidence_ids": reviewer_input.evidence_bundle.evidence_ids,

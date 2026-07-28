@@ -45,9 +45,12 @@
 
 Fake LLM 根据角色和输入契约返回确定性 Pydantic 结果。Fake Embedding 使用 SHA-256 派生并归一化向量。它们不访问网络，不消耗模型余额，适合回归和公平对比。
 
-## 9. 真实模型入口
+## 9. 模型后端边界
 
-CLI 支持 `--backend openai_compatible`。只有环境变量完整时才执行；没有配置时明确跳过入口。相同实验的两种模式读取同一模型、embedding、温度、超时和重试配置。pytest 不调用真实 API。
+正式 Benchmark 入口固定使用 Fake LLM 与 Fake Embedding，不接受 DeepSeek
+后端，也不访问互联网。DeepSeek 只用于 CLI、API 和 Streamlit 的人工真实模型
+演示；不建议用真实模型直接重跑现有 300 条正式记录。pytest 中的 DeepSeek
+协议测试使用 `httpx.MockTransport`，不会调用真实 API。
 
 ## 10. 指标定义
 
@@ -85,4 +88,3 @@ CLI 支持 `--backend openai_compatible`。只有环境变量完整时才执行�
 ## 16. 实验局限
 
 Fake 模型不代表真实厂商推理时延和 tokenizer；当前任务规模较小；Windows 文件系统和 SQLite 性能不能替代 openEuler 实测；structured 字符统计包含协议字符串，因此不能直接等价为自然语言 Prompt Token。
-

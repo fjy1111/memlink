@@ -1,11 +1,13 @@
-"""Fake and OpenAI-compatible language-model clients."""
+"""Fake and DeepSeek language-model clients."""
 
 import asyncio
 import json
+import re
+from collections.abc import Mapping
 from typing import Any, Protocol, TypeVar, cast
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings
 from app.core.logging import get_logger
@@ -16,6 +18,23 @@ ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 
 class LLMClientError(RuntimeError):
     """Clear, provider-neutral model request failure."""
+
+
+class _LLMResponseError(LLMClientError):
+    """Redacted, categorized response failure used for bounded retries."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: str,
+        repair_hint: str,
+        retryable: bool = True,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.repair_hint = repair_hint
+        self.retryable = retryable
 
 
 class LLMClient(Protocol):
@@ -195,7 +214,7 @@ class FakeLLMClient:
 
 
 class OpenAICompatibleLLMClient:
-    """Provider-neutral chat-completions adapter using ``httpx``."""
+    """Reusable OpenAI-compatible chat-completions transport."""
 
     def __init__(
         self,
@@ -206,20 +225,28 @@ class OpenAICompatibleLLMClient:
         timeout_seconds: float = 60.0,
         max_retries: int = 2,
         temperature: float = 0.0,
+        max_tokens: int = 1500,
+        provider_name: str = "OpenAI-compatible",
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        if not api_key:
-            raise ValueError("LLM API key is required for openai_compatible backend")
-        if not base_url:
-            raise ValueError("LLM base URL is required for openai_compatible backend")
-        if not model:
-            raise ValueError("LLM model is required for openai_compatible backend")
+        if not api_key.strip() or api_key.strip() == "replace-me":
+            raise ValueError(f"{provider_name} API Key 未配置")
+        if (
+            not base_url.strip()
+            or not base_url.startswith(("https://", "http://"))
+            or "replace-with-" in base_url
+        ):
+            raise ValueError(f"{provider_name} Base URL 未配置")
+        if not model.strip() or model.startswith("replace-with-"):
+            raise ValueError(f"{provider_name} 模型名称未配置")
         self._api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
         self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.provider_name = provider_name
         self._transport = transport
         self.retry_count = 0
 
@@ -233,31 +260,59 @@ class OpenAICompatibleLLMClient:
     ) -> str | ResponseModelT:
         """Call a configured OpenAI-compatible chat endpoint with retries."""
 
-        del context
-        schema_instruction = ""
-        if response_model is not None:
-            schema_instruction = (
-                "\nReturn only a JSON object matching this schema:\n"
-                + json.dumps(
-                    response_model.model_json_schema(),
-                    ensure_ascii=False,
-                )
-            )
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "temperature": self.temperature,
-            "messages": [
-                {"role": "system", "content": system_prompt + schema_instruction},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-        if response_model is not None:
-            payload["response_format"] = {"type": "json_object"}
-
+        data = context or {}
+        structured = response_model is not None
+        agent_role = str(
+            data.get("role")
+            or self._infer_agent_role(response_model)
+        )
+        schema_instruction = (
+            self._structured_instruction(response_model)
+            if response_model is not None
+            else ""
+        )
         endpoint = f"{self.base_url}/chat/completions"
         headers = {"Authorization": f"Bearer {self._api_key}"}
-        last_error: Exception | None = None
+        last_error = f"{self.provider_name} 请求失败"
+        repair_hint = ""
         for attempt in range(self.max_retries + 1):
+            current_user_prompt = user_prompt
+            if structured and repair_hint:
+                current_user_prompt += self._repair_instruction(
+                    response_model,
+                    repair_hint,
+                )
+            request_max_tokens = (
+                max(self.max_tokens, 4096)
+                if structured
+                else self.max_tokens
+            )
+            payload: dict[str, Any] = {
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": request_max_tokens,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": system_prompt + schema_instruction,
+                    },
+                    {"role": "user", "content": current_user_prompt},
+                ],
+            }
+            if structured:
+                payload["response_format"] = {"type": "json_object"}
+                payload["thinking"] = {"type": "disabled"}
+            logger.info(
+                "LLM request provider=%s model=%s agent=%s attempt=%d "
+                "json_mode=%s thinking=%s max_tokens=%d",
+                self.provider_name.lower(),
+                self.model,
+                agent_role,
+                attempt + 1,
+                structured,
+                "disabled" if structured else "default",
+                request_max_tokens,
+            )
             try:
                 async with httpx.AsyncClient(
                     timeout=self.timeout_seconds,
@@ -265,13 +320,85 @@ class OpenAICompatibleLLMClient:
                 ) as client:
                     response = await client.post(endpoint, headers=headers, json=payload)
                     response.raise_for_status()
-                body = response.json()
-                content = body["choices"][0]["message"]["content"]
+                body = self._decode_response_body(response)
+                (
+                    content,
+                    finish_reason,
+                    reasoning_chars,
+                    has_tool_calls,
+                ) = self._extract_response(body)
+                logger.info(
+                    "LLM response provider=%s model=%s agent=%s attempt=%d "
+                    "http_status=%d finish_reason=%s content_chars=%d "
+                    "reasoning_content_chars=%d json_mode=%s thinking=%s "
+                    "tool_calls=%s",
+                    self.provider_name.lower(),
+                    self.model,
+                    agent_role,
+                    attempt + 1,
+                    response.status_code,
+                    finish_reason,
+                    len(content) if isinstance(content, str) else 0,
+                    reasoning_chars,
+                    structured,
+                    "disabled" if structured else "default",
+                    has_tool_calls,
+                )
+                if finish_reason == "length":
+                    raise _LLMResponseError(
+                        f"{self.provider_name} 响应因 finish_reason=length "
+                        "被截断",
+                        category="truncated",
+                        repair_hint=(
+                            "上次 json 响应被截断；请缩短字符串内容，但仍返回"
+                            "包含全部必填字段的完整 json 对象。"
+                        ),
+                    )
                 if not isinstance(content, str) or not content.strip():
-                    raise LLMClientError("Model returned empty content")
+                    if has_tool_calls:
+                        detail = "返回了 tool_calls，但没有最终 content"
+                        category = "tool_calls_without_content"
+                    elif reasoning_chars:
+                        detail = (
+                            "返回空 content；reasoning_content 存在但不会被"
+                            "当作业务结果"
+                        )
+                        category = "reasoning_without_content"
+                    else:
+                        detail = "返回空 content"
+                        category = "empty_content"
+                    raise _LLMResponseError(
+                        f"{self.provider_name} {detail}",
+                        category=category,
+                        repair_hint=(
+                            "上次响应的 content 为空；请直接返回完整 json "
+                            "对象，不要只生成推理内容或工具调用。"
+                            if structured
+                            else "上次响应为空；请返回最终文本答案。"
+                        ),
+                    )
                 if response_model is None:
-                    return content
-                return response_model.model_validate_json(content)
+                    return content.strip()
+                return self._validate_structured_content(
+                    content,
+                    response_model,
+                    agent_role=agent_role,
+                    attempt=attempt + 1,
+                )
+            except _LLMResponseError as exc:
+                last_error = str(exc)
+                retryable = exc.retryable
+                repair_hint = exc.repair_hint
+                logger.warning(
+                    "LLM validation failed provider=%s model=%s agent=%s "
+                    "attempt=%d category=%s error=%s",
+                    self.provider_name.lower(),
+                    self.model,
+                    agent_role,
+                    attempt + 1,
+                    exc.category,
+                    last_error,
+                )
             except (
                 httpx.HTTPError,
                 KeyError,
@@ -279,29 +406,336 @@ class OpenAICompatibleLLMClient:
                 ValueError,
                 LLMClientError,
             ) as exc:
-                last_error = exc
-                if attempt < self.max_retries:
-                    self.retry_count += 1
-                    logger.warning(
-                        "LLM request attempt %d failed; retrying",
-                        attempt + 1,
-                    )
-                    await asyncio.sleep(min(0.1 * (2**attempt), 1.0))
-        raise LLMClientError(
-            f"LLM request failed after {self.max_retries + 1} attempts: {last_error}"
-        ) from last_error
+                last_error, retryable = self._safe_error(exc)
+                http_status = (
+                    exc.response.status_code
+                    if isinstance(exc, httpx.HTTPStatusError)
+                    else "none"
+                )
+                repair_hint = (
+                    "上次请求失败；重新返回目标 Schema 对应的完整 json 对象。"
+                    if structured
+                    else ""
+                )
+                logger.warning(
+                    "LLM request failed provider=%s model=%s agent=%s "
+                    "attempt=%d http_status=%s error=%s",
+                    self.provider_name.lower(),
+                    self.model,
+                    agent_role,
+                    attempt + 1,
+                    http_status,
+                    last_error,
+                )
+            if retryable and attempt < self.max_retries:
+                self.retry_count += 1
+                logger.warning(
+                    "LLM retry provider=%s model=%s agent=%s next_attempt=%d",
+                    self.provider_name.lower(),
+                    self.model,
+                    agent_role,
+                    attempt + 2,
+                )
+                await asyncio.sleep(min(0.1 * (2**attempt), 1.0))
+                continue
+            break
+        raise LLMClientError(last_error) from None
+
+    def _decode_response_body(
+        self,
+        response: httpx.Response,
+    ) -> Mapping[str, Any]:
+        """Decode the HTTP response envelope without exposing its content."""
+
+        try:
+            body = response.json()
+        except ValueError:
+            raise _LLMResponseError(
+                f"{self.provider_name} HTTP 响应不是有效 JSON",
+                category="invalid_response_envelope",
+                repair_hint="请返回标准 Chat Completions JSON 响应。",
+            ) from None
+        if not isinstance(body, Mapping):
+            raise _LLMResponseError(
+                f"{self.provider_name} HTTP 响应顶层格式无效",
+                category="invalid_response_envelope",
+                repair_hint="请返回标准 Chat Completions JSON 响应。",
+            )
+        return body
+
+    def _extract_response(
+        self,
+        body: Mapping[str, Any],
+    ) -> tuple[Any, str, int, bool]:
+        """Validate choices/message and return only safe response metadata."""
+
+        choices = body.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise _LLMResponseError(
+                f"{self.provider_name} 响应缺少 choices",
+                category="missing_choices",
+                repair_hint="请返回包含一个有效 choice 的响应。",
+            )
+        choice = choices[0]
+        if not isinstance(choice, Mapping):
+            raise _LLMResponseError(
+                f"{self.provider_name} choice 格式无效",
+                category="invalid_choice",
+                repair_hint="请返回标准 Chat Completions choice。",
+            )
+        message = choice.get("message")
+        if not isinstance(message, Mapping):
+            raise _LLMResponseError(
+                f"{self.provider_name} 响应缺少 message",
+                category="missing_message",
+                repair_hint="请返回包含 message.content 的响应。",
+            )
+        finish_reason = str(choice.get("finish_reason") or "unknown")
+        reasoning = message.get("reasoning_content")
+        reasoning_chars = len(reasoning) if isinstance(reasoning, str) else 0
+        tool_calls = message.get("tool_calls")
+        has_tool_calls = isinstance(tool_calls, list) and bool(tool_calls)
+        return (
+            message.get("content"),
+            finish_reason,
+            reasoning_chars,
+            has_tool_calls,
+        )
+
+    def _validate_structured_content(
+        self,
+        content: str,
+        response_model: type[ResponseModelT],
+        *,
+        agent_role: str,
+        attempt: int,
+    ) -> ResponseModelT:
+        """Strip optional fences, parse JSON, then enforce the Pydantic model."""
+
+        normalized = self._strip_json_fence(content)
+        try:
+            parsed = json.loads(normalized)
+        except json.JSONDecodeError as exc:
+            logger.info(
+                "LLM structured validation provider=%s model=%s agent=%s "
+                "attempt=%d json_parse=failed schema_validation=not_run",
+                self.provider_name.lower(),
+                self.model,
+                agent_role,
+                attempt,
+            )
+            raise _LLMResponseError(
+                f"{self.provider_name} JSON 解析失败"
+                f"（第 {exc.lineno} 行第 {exc.colno} 列）",
+                category="json_parse_failed",
+                repair_hint=(
+                    "上次 content 不是合法 json；请只返回一个语法正确、"
+                    "无 Markdown 的 json 对象。"
+                ),
+            ) from None
+        if not isinstance(parsed, dict):
+            raise _LLMResponseError(
+                f"{self.provider_name} JSON 顶层必须是对象",
+                category="json_not_object",
+                repair_hint="请返回 json 对象，不要返回数组或普通文本。",
+            )
+        logger.info(
+            "LLM structured validation provider=%s model=%s agent=%s "
+            "attempt=%d json_parse=success schema_validation=pending",
+            self.provider_name.lower(),
+            self.model,
+            agent_role,
+            attempt,
+        )
+        try:
+            validated = response_model.model_validate(parsed)
+        except ValidationError as exc:
+            missing_fields = sorted(
+                ".".join(str(part) for part in error["loc"])
+                for error in exc.errors(include_input=False)
+                if error["type"] == "missing"
+            )
+            invalid_fields = sorted(
+                {
+                    ".".join(str(part) for part in error["loc"]) or "<root>"
+                    for error in exc.errors(include_input=False)
+                    if error["type"] != "missing"
+                }
+            )
+            if missing_fields:
+                detail = "缺少必填字段：" + ", ".join(missing_fields)
+                category = "schema_missing_fields"
+                repair_hint = (
+                    "上次 json 缺少必填字段 "
+                    + ", ".join(missing_fields)
+                    + "；请按 Schema 补齐并返回完整 json。"
+                )
+            else:
+                detail = "字段类型或约束错误：" + ", ".join(invalid_fields)
+                category = "schema_invalid_fields"
+                repair_hint = (
+                    "上次 json 的字段类型或约束不正确；请严格按照 Schema "
+                    "和示例重新生成。"
+                )
+            logger.info(
+                "LLM structured validation provider=%s model=%s agent=%s "
+                "attempt=%d json_parse=success schema_validation=failed "
+                "category=%s",
+                self.provider_name.lower(),
+                self.model,
+                agent_role,
+                attempt,
+                category,
+            )
+            raise _LLMResponseError(
+                f"{self.provider_name} Schema 校验失败：{detail}",
+                category=category,
+                repair_hint=repair_hint,
+            ) from None
+        logger.info(
+            "LLM structured validation provider=%s model=%s agent=%s "
+            "attempt=%d json_parse=success schema_validation=success",
+            self.provider_name.lower(),
+            self.model,
+            agent_role,
+            attempt,
+        )
+        return validated
+
+    @staticmethod
+    def _strip_json_fence(content: str) -> str:
+        """Accept one accidental Markdown fence while prompts still forbid it."""
+
+        stripped = content.strip()
+        fenced = re.fullmatch(
+            r"```(?:json)?\s*(.*?)\s*```",
+            stripped,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return fenced.group(1).strip() if fenced else stripped
+
+    @staticmethod
+    def _infer_agent_role(
+        response_model: type[BaseModel] | None,
+    ) -> str:
+        roles = {
+            "TaskPlan": "planner",
+            "EvidenceBundle": "retriever",
+            "ExecutionResult": "executor",
+            "ReviewResult": "reviewer",
+        }
+        if response_model is None:
+            return "unknown"
+        return roles.get(response_model.__name__, "unknown")
+
+    @staticmethod
+    def _structured_instruction(
+        response_model: type[BaseModel],
+    ) -> str:
+        """Build explicit lowercase-json rules, Schema, and complete example."""
+
+        schema = response_model.model_json_schema()
+        examples = schema.get("examples")
+        example = examples[0] if isinstance(examples, list) and examples else {}
+        return (
+            "\n\nSTRICT STRUCTURED OUTPUT RULES:\n"
+            "- Output exactly one valid json object and nothing else.\n"
+            "- Do not output Markdown, explanations, commentary, or code fences.\n"
+            "- Do not wrap the object in a triple-backtick json block.\n"
+            "- Include every required field with the exact data type shown below.\n"
+            "- The json must satisfy the target Schema and semantic constraints.\n"
+            "TARGET JSON SCHEMA (required fields and field types):\n"
+            + json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+            + "\nCOMPLETE JSON EXAMPLE:\n"
+            + json.dumps(example, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    def _repair_instruction(
+        self,
+        response_model: type[BaseModel] | None,
+        repair_hint: str,
+    ) -> str:
+        """Repeat safe repair guidance without echoing model output or errors."""
+
+        if response_model is None:
+            return "\n\nReturn a non-empty final text answer."
+        return (
+            "\n\nSTRUCTURED JSON REPAIR REQUEST:\n"
+            + repair_hint
+            + self._structured_instruction(response_model)
+        )
+
+    def _safe_error(self, error: Exception) -> tuple[str, bool]:
+        """Return a redacted user-facing error and whether it is retryable."""
+
+        prefix = self.provider_name
+        if isinstance(error, httpx.TimeoutException):
+            return f"{prefix} 请求超时，请检查网络或增大超时时间", True
+        if isinstance(error, httpx.HTTPStatusError):
+            status = error.response.status_code
+            if status == 401:
+                return f"{prefix} 认证失败（HTTP 401），请检查 API Key", False
+            if status == 403:
+                return f"{prefix} 拒绝访问（HTTP 403），请检查权限", False
+            if status == 402:
+                return f"{prefix} 账户余额不足（HTTP 402）", False
+            if status == 429:
+                return f"{prefix} 请求频率受限（HTTP 429），请稍后重试", True
+            if status >= 500:
+                return f"{prefix} 服务暂时不可用（HTTP {status}）", True
+            return f"{prefix} 请求被拒绝（HTTP {status}）", False
+        if isinstance(error, httpx.TransportError):
+            return f"{prefix} 网络请求失败，请检查网络和 Base URL", True
+        if isinstance(error, (KeyError, TypeError)):
+            return f"{prefix} 返回了无法识别的响应格式", True
+        if isinstance(error, ValueError):
+            return f"{prefix} 返回内容未通过结构化校验", True
+        if isinstance(error, LLMClientError):
+            return f"{prefix} 返回了空内容", True
+        return f"{prefix} 请求失败", False
+
+
+class DeepSeekLLMClient(OpenAICompatibleLLMClient):
+    """DeepSeek chat client built on the existing compatible transport."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        model: str,
+        timeout_seconds: float = 60.0,
+        max_retries: int = 2,
+        temperature: float = 0.2,
+        max_tokens: int = 1500,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            provider_name="DeepSeek",
+            transport=transport,
+        )
 
 
 def create_llm_client(settings: Settings) -> LLMClient:
-    """Create the configured language-model adapter without vendor coupling."""
+    """Create the configured Fake or DeepSeek language-model adapter."""
 
     if settings.llm_backend == "fake":
         return FakeLLMClient()
-    return OpenAICompatibleLLMClient(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-        model=settings.llm_model,
+    if settings.llm_backend != "deepseek":
+        raise ValueError(f"Unsupported LLM backend: {settings.llm_backend}")
+    return DeepSeekLLMClient(
+        api_key=settings.deepseek_api_key,
+        base_url=settings.deepseek_base_url,
+        model=settings.deepseek_model,
         timeout_seconds=settings.llm_timeout_seconds,
         max_retries=settings.llm_max_retries,
         temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
     )

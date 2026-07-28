@@ -32,19 +32,10 @@ def load_examples(path: Path = EXAMPLES_FILE) -> list[dict[str, str]]:
     return examples
 
 
-def real_backend_is_configured(settings: Settings) -> bool:
-    """Return whether both real model adapters have complete configuration."""
+def deepseek_backend_is_configured(settings: Settings) -> bool:
+    """Return whether the DeepSeek chat configuration is complete."""
 
-    return all(
-        (
-            settings.llm_api_key,
-            settings.llm_base_url,
-            settings.llm_model,
-            settings.embedding_model,
-            settings.embedding_base_url or settings.llm_base_url,
-            settings.embedding_api_key or settings.llm_api_key,
-        )
-    )
+    return settings.deepseek_is_configured()
 
 
 def build_orchestrator(
@@ -57,14 +48,15 @@ def build_orchestrator(
 ) -> TaskOrchestrator:
     """Create the configured service without accepting credentials from UI."""
 
-    if backend == "openai_compatible" and not real_backend_is_configured(
-        settings
-    ):
-        raise ValueError("真实模型环境变量配置不完整，请改用离线 Fake 模式。")
+    if backend == "deepseek" and not deepseek_backend_is_configured(settings):
+        raise ValueError(
+            "DeepSeek 配置不完整：请在项目根目录 .env 中配置 "
+            "API Key、Base URL 和模型名称。"
+        )
     active = settings.model_copy(
         update={
             "llm_backend": backend,
-            "embedding_backend": backend,
+            "embedding_backend": "fake",
             "enable_shared_memory": enable_shared_memory,
             "enable_semantic_state": enable_semantic_state,
             "enable_result_reference": enable_result_reference,
@@ -118,4 +110,3 @@ def load_benchmark_results(
         "stability": json.loads(stability_path.read_text(encoding="utf-8")),
         "results_dir": str(results_dir),
     }
-

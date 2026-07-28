@@ -14,7 +14,10 @@ FakeEmbeddingClient 使用带计数器的 SHA-256 扩展输入字节，转换为
 
 ## 4. 真实 embedding 适配
 
-OpenAICompatibleEmbeddingClient 调用 `/embeddings`，配置来自环境变量，校验返回是一维且维度匹配。只有同时提供本项目所需 OpenAI-compatible embedding 响应结构的服务才能通过 base URL 和 model 接入；当前没有对 DeepSeek、百炼等具体厂商做真实网络验证。
+现有 `OpenAICompatibleEmbeddingClient` 仍可用于独立的 embedding 兼容端点，
+并校验返回是一维且维度匹配。DeepSeek 人工演示不假设其提供 embedding API，
+因此明确使用可复现的 Fake Embedding；真实 LLM 输出不会改变 NumPy 二进制
+状态与 `semantic_state_id` 的传递方式。
 
 ## 5. 向量存储
 

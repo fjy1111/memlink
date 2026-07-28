@@ -13,6 +13,12 @@ class RetrieverAgent(BaseAgent):
         "You are Retriever Agent. Retrieve and rank evidence only. "
         "Do not produce the final answer or execute remediation actions."
     )
+    structured_system_prompt = (
+        system_prompt
+        + " In structured mode, output only the json object defined by the "
+        "appended EvidenceBundle Schema and complete example; never output "
+        "Markdown or explanatory text."
+    )
     capabilities = (
         "knowledge_retrieval",
         "keyword_search",
@@ -52,10 +58,11 @@ class RetrieverAgent(BaseAgent):
 
         try:
             generated = await self._llm.generate(
-                system_prompt=self.system_prompt,
+                system_prompt=self.structured_system_prompt,
                 user_prompt=retriever_input.model_dump_json(),
                 response_model=EvidenceBundle,
                 context={
+                    "role": "retriever",
                     "query": retriever_input.query_text,
                     "knowledge_items": retriever_input.knowledge_items,
                     "shared_memories": retriever_input.shared_memories,

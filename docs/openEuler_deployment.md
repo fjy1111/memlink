@@ -177,16 +177,18 @@ find data/memory -maxdepth 1 -type f -name 'memlink.db*' -delete
 
 ## 17. 真实模型（可选）
 
-密钥只通过当前 shell 环境变量提供。默认验收不要消耗真实模型余额：
+DeepSeek 密钥只写入 `/home/fjy/memlink/.env`，不得写入 shell 历史、源码或
+页面。默认验收和 Benchmark 不消耗真实模型余额。完成 `.env` 配置后，可人工
+运行两种通信模式：
 
 ```bash
-.venv/bin/python -m app.benchmark.cli run \
-  --rounds 3 \
-  --experiment all \
-  --backend openai_compatible
+cd /home/fjy/memlink
+.venv/bin/python -m app.cli run-demo --mode text --backend deepseek
+.venv/bin/python -m app.cli run-demo --mode structured --backend deepseek
 ```
 
-配置不完整时入口会明确跳过。密钥不会保存到页面、日志或结果文件。
+配置不完整或请求失败时入口会返回脱敏错误，不会回退到 Fake。密钥不会保存到
+页面、日志、结果文件或 Benchmark。
 
 ## 18. 常见问题
 

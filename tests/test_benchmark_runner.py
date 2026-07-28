@@ -15,6 +15,7 @@ from app.core.config import Settings
 
 def build_settings(tmp_path: Path) -> Settings:
     return Settings(
+        _env_file=None,
         environment="test",
         metrics_dir=tmp_path / "unused-metrics",
         state_dir=tmp_path / "unused-states",
@@ -35,6 +36,20 @@ def test_formal_matrix_contains_five_real_configurations() -> None:
     assert len(select_experiments("ablation")) == 5
     with pytest.raises(ValueError):
         select_experiments("not-real")
+
+
+def test_benchmark_rejects_any_real_network_backend(tmp_path: Path) -> None:
+    settings = build_settings(tmp_path).model_copy(
+        update={
+            "llm_backend": "deepseek",
+            "deepseek_api_key": "test-only-secret",
+            "deepseek_base_url": "https://example.invalid/v1",
+            "deepseek_model": "test-model",
+        }
+    )
+
+    with pytest.raises(ValueError, match="仅允许使用离线 Fake"):
+        BenchmarkRunner(settings=settings)
 
 
 @pytest.mark.asyncio
@@ -172,4 +187,3 @@ async def test_runner_persists_failed_runs_truthfully(
     assert all("intentional offline failure" in record.error_message for record in artifacts.records)
     assert artifacts.summaries[0].completion_rate == 0.0
     assert artifacts.summaries[0].error_rate == 1.0
-

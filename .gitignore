@@ -14,6 +14,8 @@ htmlcov/
 .venv/
 venv/
 .env
+.env.*
+!.env.example
 .streamlit/secrets.toml
 
 # Runtime data

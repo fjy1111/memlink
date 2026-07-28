@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from app.cli import build_parser
+
 
 @pytest.mark.parametrize("mode", ["text", "structured"])
 def test_cli_run_demo_offline(mode: str, tmp_path: Path) -> None:
@@ -31,6 +33,8 @@ def test_cli_run_demo_offline(mode: str, tmp_path: Path) -> None:
             "run-demo",
             "--mode",
             mode,
+            "--backend",
+            "fake",
         ],
         cwd=Path(__file__).resolve().parents[1],
         env=environment,
@@ -46,6 +50,16 @@ def test_cli_run_demo_offline(mode: str, tmp_path: Path) -> None:
     assert "任务 ID：" in completed.stdout
     assert "Agent 执行轨迹：" in completed.stdout
     assert "共享记忆命中数：" in completed.stdout
+    assert "模型后端：fake" in completed.stdout
+
+
+@pytest.mark.parametrize("backend", ["fake", "deepseek"])
+def test_cli_accepts_explicit_backend_selection(backend: str) -> None:
+    arguments = build_parser().parse_args(
+        ["run-demo", "--mode", "text", "--backend", backend]
+    )
+
+    assert arguments.backend == backend
 
 
 def test_benchmark_cli_is_importable_from_a_fresh_process() -> None:

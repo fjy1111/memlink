@@ -5,8 +5,10 @@ from typing import Any
 import streamlit as st
 
 from app.core.config import get_settings
+from app.agents.base import AgentExecutionError
+from app.llm import LLMClientError
 from app.models import CommunicationMode, TaskResult
-from app.runtime.orchestrator import TaskOrchestrator
+from app.runtime.orchestrator import OrchestrationError, TaskOrchestrator
 from app.ui.presenter import (
     benchmark_table_rows,
     build_agent_cards,
@@ -15,9 +17,9 @@ from app.ui.presenter import (
 )
 from app.ui.service import (
     build_orchestrator,
+    deepseek_backend_is_configured,
     load_benchmark_results,
     load_examples,
-    real_backend_is_configured,
     run_coroutine,
     run_task,
 )
@@ -208,12 +210,30 @@ def render_task_demo() -> None:
         )
     )
 
-    backend_options = {"离线 Fake（推荐）": "fake"}
-    if real_backend_is_configured(settings):
-        backend_options["已配置 OpenAI-compatible"] = "openai_compatible"
+    backend_options = {
+        "Fake（离线演示）": "fake",
+        "DeepSeek（真实模型）": "deepseek",
+    }
     backend_label = st.selectbox("模型后端", list(backend_options))
-    if len(backend_options) == 1:
-        st.caption("未检测到完整真实模型环境变量，页面仅提供离线 Fake。")
+    selected_backend = backend_options[backend_label]
+    if selected_backend == "deepseek":
+        key_is_configured = (
+            bool(settings.deepseek_api_key.strip())
+            and settings.deepseek_api_key.strip() != "replace-me"
+        )
+        key_status = (
+            "已配置"
+            if key_is_configured
+            else "未配置"
+        )
+        st.write("当前后端：DeepSeek")
+        st.write(f"模型名称：{settings.deepseek_model or '未配置'}")
+        st.write(f"Base URL：{settings.deepseek_base_url or '未配置'}")
+        st.write(f"API Key：{key_status}")
+        if not deepseek_backend_is_configured(settings):
+            st.warning("DeepSeek 配置不完整，运行前请更新项目根目录的 .env。")
+    else:
+        st.caption("当前后端：Fake；离线运行，不访问互联网。")
 
     option_columns = st.columns(3)
     enable_shared_memory = option_columns[0].toggle(
@@ -232,7 +252,7 @@ def render_task_demo() -> None:
     if st.button("运行四 Agent 协作", type="primary"):
         try:
             orchestrator = get_demo_orchestrator(
-                backend=backend_options[backend_label],
+                backend=selected_backend,
                 enable_shared_memory=enable_shared_memory,
                 enable_semantic_state=enable_semantic_state,
                 enable_result_reference=enable_result_reference,
@@ -249,8 +269,15 @@ def render_task_demo() -> None:
                 )
             st.session_state["last_result"] = result
             st.session_state["last_orchestrator"] = orchestrator
-        except Exception as exc:
-            st.error(f"任务运行失败：{type(exc).__name__}: {exc}")
+        except (
+            AgentExecutionError,
+            LLMClientError,
+            OrchestrationError,
+            ValueError,
+        ) as exc:
+            st.error(f"任务运行失败：{exc}")
+        except Exception:
+            st.error("任务运行失败：发生未预期错误，详细信息已隐藏。")
 
     result = st.session_state.get("last_result")
     orchestrator = st.session_state.get("last_orchestrator")
@@ -315,4 +342,3 @@ with task_tab:
     render_task_demo()
 with benchmark_tab:
     render_benchmark()
-

@@ -16,14 +16,15 @@ from app.ui.presenter import (
 )
 from app.ui.service import (
     build_orchestrator,
+    deepseek_backend_is_configured,
     load_benchmark_results,
-    real_backend_is_configured,
     run_task,
 )
 
 
 def ui_settings(tmp_path: Path) -> Settings:
     return Settings(
+        _env_file=None,
         environment="test",
         metrics_dir=tmp_path / "metrics",
         state_dir=tmp_path / "states",
@@ -33,20 +34,51 @@ def ui_settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_real_backend_is_never_enabled_without_environment_credentials(
+def test_deepseek_backend_is_never_enabled_without_environment_credentials(
     tmp_path: Path,
 ) -> None:
     settings = ui_settings(tmp_path)
 
-    assert real_backend_is_configured(settings) is False
+    assert deepseek_backend_is_configured(settings) is False
     with pytest.raises(ValueError, match="配置不完整"):
         build_orchestrator(
             settings,
-            backend="openai_compatible",
+            backend="deepseek",
             enable_shared_memory=True,
             enable_semantic_state=True,
             enable_result_reference=True,
         )
+
+    placeholder_settings = settings.model_copy(
+        update={
+            "deepseek_api_key": "replace-me",
+            "deepseek_base_url": "replace-with-deepseek-base-url",
+            "deepseek_model": "replace-with-model-name",
+        }
+    )
+    assert deepseek_backend_is_configured(placeholder_settings) is False
+
+
+def test_ui_can_build_deepseek_with_fake_embedding(tmp_path: Path) -> None:
+    settings = ui_settings(tmp_path).model_copy(
+        update={
+            "deepseek_api_key": "test-only-secret",
+            "deepseek_base_url": "https://example.invalid/v1",
+            "deepseek_model": "test-model",
+        }
+    )
+
+    orchestrator = build_orchestrator(
+        settings,
+        backend="deepseek",
+        enable_shared_memory=True,
+        enable_semantic_state=True,
+        enable_result_reference=True,
+    )
+
+    assert deepseek_backend_is_configured(settings) is True
+    assert orchestrator._backend_name == "deepseek"
+    assert orchestrator._embedding.__class__.__name__ == "FakeEmbeddingClient"
 
 
 @pytest.mark.asyncio
@@ -176,6 +208,8 @@ def test_streamlit_page_runs_fake_task_without_shell(
     source = page.read_text(encoding="utf-8")
     assert "subprocess" not in source
     assert "os.system" not in source
-    assert "API Key" not in source
+    assert "settings.deepseek_api_key" in source
+    assert "st.write(settings.deepseek_api_key)" not in source
+    assert 'st.session_state["deepseek_api_key"]' not in source
+    assert "MEMLINK_DEEPSEEK_API_KEY" not in source
     get_settings.cache_clear()
-

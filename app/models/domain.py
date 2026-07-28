@@ -34,7 +34,7 @@ class LLMBackend(StrEnum):
     """Backends selectable by request without carrying credentials."""
 
     FAKE = "fake"
-    OPENAI_COMPATIBLE = "openai_compatible"
+    DEEPSEEK = "deepseek"
 
 
 class AgentRole(StrEnum):

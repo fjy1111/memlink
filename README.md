@@ -71,7 +71,7 @@ app/
 ├─ api/          FastAPI 路由
 ├─ benchmark/    实验矩阵、Runner、统计和输出
 ├─ core/         配置与日志
-├─ llm/          Fake/OpenAI-compatible 适配器
+├─ llm/          Fake/DeepSeek 适配器
 ├─ memory/       SQLite 共享记忆
 ├─ models/       API 与运行领域模型
 ├─ protocol/     AgentMessage 与 AgentRegistry
@@ -115,11 +115,21 @@ bash scripts/linux/run_benchmark.sh 10
 ## CLI
 
 ```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text --backend fake
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured --backend fake
 ```
 
 可附加 `--group rag|api --task-index 1|2|3`。
+
+真实模型仅支持 DeepSeek。先按“DeepSeek 配置”创建本地 `.env`，再运行：
+
+```powershell
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text --backend deepseek
+D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured --backend deepseek
+```
+
+两种模式都会让 Planner、Retriever、Executor、Reviewer 分别调用一次所选
+LLM 后端。DeepSeek 失败时程序直接返回脱敏错误，不会回退到 Fake。
 
 ## API
 
@@ -149,7 +159,10 @@ D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m uvicorn app.main
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m streamlit run app/ui/streamlit_app.py
 ```
 
-页面支持任务输入、示例任务、双模式、三个消融开关、四 Agent 轨迹、通信指标、记忆、SemanticState、Reviewer 结果和阶段三真实 Benchmark。页面不接受 API Key。
+页面支持任务输入、示例任务、双模式、Fake/DeepSeek 后端、三个消融开关、四
+Agent 轨迹、通信指标、记忆、SemanticState、Reviewer 结果和阶段三真实
+Benchmark。页面不接受 API Key；选择 DeepSeek 后只显示模型、Base URL 以及
+“API Key 已配置/未配置”状态。
 
 ## Benchmark
 
@@ -158,30 +171,78 @@ D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cl
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cli summarize
 ```
 
-可用实验：`text`、`structured`、`structured_no_memory`、`structured_no_semantic_state`、`structured_no_result_ref`、`ablation`。结果写入被 Git 忽略的 `benchmarks/results/`。方法与真实结果见 [benchmark_methodology.md](docs/benchmark_methodology.md) 和 [benchmark_report.md](docs/benchmark_report.md)。
+可用实验：`text`、`structured`、`structured_no_memory`、`structured_no_semantic_state`、`structured_no_result_ref`、`ablation`。Benchmark 入口固定使用 Fake LLM 和 Fake Embedding，不访问互联网。结果写入被 Git 忽略的 `benchmarks/results/`。方法与真实结果见 [benchmark_methodology.md](docs/benchmark_methodology.md) 和 [benchmark_report.md](docs/benchmark_report.md)。
 
 ## 测试
 
-所有自动测试默认使用 Fake 模型，不访问真实 API：
+所有自动测试默认使用 Fake 模型；DeepSeek 客户端测试使用本地
+`httpx.MockTransport`，两者都不访问真实 API：
 
 ```powershell
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
 ```
 
+## DeepSeek 配置
+
+Fake 是默认后端，用于 pytest、Benchmark 和离线复现。DeepSeek 只用于人工
+CLI、API 或 Streamlit 演示，真实调用可能产生费用；不建议用真实模型重跑
+现有 300 条正式 Benchmark。
+
+API Key 只能保存在仓库根目录的 `.env`，不能写入源码、测试、README、命令行
+参数或 Streamlit 输入框：
+
+- Windows：`E:\memlink\.env`
+- openEuler：`/home/fjy/memlink/.env`
+
+不要覆盖已有 `.env`。首次配置时可复制 `.env.example`，再在本机编辑：
+
+```dotenv
+MEMLINK_LLM_BACKEND=fake
+MEMLINK_DEEPSEEK_API_KEY=replace-me
+MEMLINK_DEEPSEEK_BASE_URL=replace-with-deepseek-base-url
+MEMLINK_DEEPSEEK_MODEL=replace-with-model-name
+MEMLINK_LLM_TIMEOUT_SECONDS=60
+MEMLINK_LLM_MAX_RETRIES=2
+MEMLINK_LLM_TEMPERATURE=0.2
+MEMLINK_LLM_MAX_TOKENS=1500
+```
+
+其中 API Key、Base URL 和模型名称必须由维护者按当前 DeepSeek 控制台与官方
+文档填写。`.env.example` 只能保留占位符。用以下命令确认真实 `.env` 不会被
+Git 跟踪：
+
+```powershell
+git check-ignore -v .env
+git status --short --ignored .env
+```
+
+openEuler 中先进入固定部署目录再运行：
+
+```bash
+cd /home/fjy/memlink
+.venv/bin/python -m app.cli run-demo --mode text --backend deepseek
+.venv/bin/python -m app.cli run-demo --mode structured --backend deepseek
+```
+
 ## 环境变量
 
-复制 `.env.example` 为 `.env`，`.env` 已被 Git 忽略。
-
-| 前缀 | 用途 |
+| 变量 | 用途 |
 | --- | --- |
 | `MEMLINK_METRICS_DIR` | 原始任务指标目录 |
 | `MEMLINK_STATE_DIR` | SemanticState 目录 |
 | `MEMLINK_MEMORY_DB_PATH` | SQLite 记忆数据库 |
 | `MEMLINK_ENABLE_*` | 记忆、状态和结果引用开关 |
-| `MEMLINK_LLM_*` | OpenAI-compatible 聊天模型配置 |
-| `MEMLINK_EMBEDDING_*` | embedding 配置 |
+| `MEMLINK_LLM_BACKEND` | `fake`（默认）或 `deepseek` |
+| `MEMLINK_DEEPSEEK_API_KEY` | 仅从根目录 `.env` 提供的 DeepSeek 密钥 |
+| `MEMLINK_DEEPSEEK_BASE_URL` | DeepSeek Chat Completions Base URL |
+| `MEMLINK_DEEPSEEK_MODEL` | DeepSeek 模型名称 |
+| `MEMLINK_LLM_TIMEOUT_SECONDS` | 单次请求超时 |
+| `MEMLINK_LLM_MAX_RETRIES` | 429、超时和服务端错误的有限重试次数 |
+| `MEMLINK_LLM_TEMPERATURE` | Chat Completions 温度 |
+| `MEMLINK_LLM_MAX_TOKENS` | 单次 Chat Completions 最大输出 Token |
+| `MEMLINK_EMBEDDING_*` | 可选 embedding 配置；DeepSeek 演示使用 Fake Embedding |
 
-默认后端为 `fake`。真实密钥只能来自环境变量，不进入请求、日志、页面或 Benchmark。
+真实密钥不会进入任务请求、日志、异常、页面输出、指标或 Benchmark。
 
 ## 演示任务
 
@@ -203,7 +264,8 @@ D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
 
 - 不提供任意 Shell 执行工具；
 - 不在页面、API 或结果中接收 API Key；
-- `.env`、数据库、状态文件和 Benchmark 结果默认忽略；
+- `.env`、`.env.*`（`.env.example` 除外）、数据库、状态文件和 Benchmark
+  结果默认忽略；
 - SQLite 使用参数化查询，状态读取校验哈希；
 - 只结束明确属于本项目的后台进程。
 

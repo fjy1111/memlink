@@ -1,6 +1,7 @@
 """Tests proving that the four agents have distinct contracts and permissions."""
 
 import pytest
+from pydantic import ValidationError
 
 from app.agents import (
     EvidenceBundle,
@@ -8,6 +9,7 @@ from app.agents import (
     ExecutionResult,
     PlannerAgent,
     RetrieverAgent,
+    ReviewResult,
     ReviewerInput,
     ReviewerAgent,
     TaskPlan,
@@ -36,6 +38,11 @@ def test_four_agents_advertise_distinct_contracts() -> None:
     assert len({registration.input_model for registration in registrations}) == 4
     assert len({registration.output_model for registration in registrations}) == 4
     assert len({agent.system_prompt for agent in agents}) == 4
+    assert all(
+        "json" in agent.structured_system_prompt
+        and "Markdown" in agent.structured_system_prompt
+        for agent in agents
+    )
     assert agents[0].registration.allowed_tools == []
     assert "vector_memory_search" in agents[1].registration.allowed_tools
     assert "analyze_incident" in agents[2].registration.allowed_tools
@@ -73,6 +80,23 @@ def test_output_models_enforce_agent_specific_validation() -> None:
     assert plan.steps == ["retrieve"]
     assert EvidenceBundle.model_fields["evidence_ids"].is_required()
     assert ExecutionResult.model_fields["success"].is_required()
+    for output_model in (
+        TaskPlan,
+        EvidenceBundle,
+        ExecutionResult,
+        ReviewResult,
+    ):
+        schema = output_model.model_json_schema()
+        assert schema["examples"]
+        assert schema["additionalProperties"] is False
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        TaskPlan(
+            goal="diagnose",
+            steps=["retrieve"],
+            assigned_capability={"1": "knowledge_retrieval"},
+            success_criteria=["verified"],
+            unexpected="must be rejected",
+        )
 
 
 @pytest.mark.asyncio

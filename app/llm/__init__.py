@@ -1,6 +1,7 @@
 """Unified language-model and embedding adapters."""
 
 from app.llm.clients import (
+    DeepSeekLLMClient,
     LLMClient,
     LLMClientError,
     FakeLLMClient,
@@ -18,6 +19,7 @@ from app.llm.embeddings import (
 __all__ = [
     "EmbeddingClient",
     "EmbeddingClientError",
+    "DeepSeekLLMClient",
     "FakeEmbeddingClient",
     "FakeLLMClient",
     "LLMClient",

@@ -15,6 +15,12 @@ class ExecutorAgent(BaseAgent):
         "You are Executor Agent. Execute only allow-listed deterministic tools. "
         "Never invoke a shell or any unregistered action."
     )
+    structured_system_prompt = (
+        system_prompt
+        + " In structured mode, output only the json object defined by the "
+        "appended ExecutionResult Schema and complete example; never output "
+        "Markdown or explanatory text."
+    )
     capabilities = ("safe_execution", "incident_analysis")
     accepted_actions = (
         MessageAction.HANDSHAKE,
@@ -76,10 +82,11 @@ class ExecutorAgent(BaseAgent):
             )
         try:
             generated = await self._llm.generate(
-                system_prompt=self.system_prompt,
+                system_prompt=self.structured_system_prompt,
                 user_prompt=executor_input.model_dump_json(),
                 response_model=ExecutionResult,
                 context={
+                    "role": "executor",
                     "action": action,
                     "evidence_ids": executor_input.evidence_bundle.evidence_ids,
                     "result_ref": f"tool:{action}",

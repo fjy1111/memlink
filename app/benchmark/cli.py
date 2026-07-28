@@ -11,7 +11,7 @@ from app.benchmark.models import BenchmarkConfig, BenchmarkRunRecord
 from app.benchmark.output import write_all_outputs
 from app.benchmark.runner import BenchmarkRunner
 from app.benchmark.statistics import summarize_records
-from app.core.config import PROJECT_ROOT, get_settings
+from app.core.config import PROJECT_ROOT, Settings
 
 DEFAULT_RESULTS_DIR = PROJECT_ROOT / "benchmarks" / "results"
 
@@ -45,8 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--temporary-root", type=Path)
     run.add_argument(
         "--backend",
-        choices=["fake", "openai_compatible"],
+        choices=["fake"],
         default="fake",
+        help="Formal benchmarks are intentionally offline and Fake-only.",
     )
     summarize = commands.add_parser(
         "summarize",
@@ -61,22 +62,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def run_command(arguments: argparse.Namespace) -> int:
-    """Run a selected matrix using fake clients unless explicitly configured."""
+    """Run a selected matrix with deterministic offline adapters."""
 
-    settings = get_settings().model_copy(
-        update={
-            "llm_backend": arguments.backend,
-            "embedding_backend": arguments.backend,
-        }
+    settings = Settings(
+        _env_file=None,
+        llm_backend=arguments.backend,
+        deepseek_api_key="",
+        deepseek_base_url="",
+        deepseek_model="",
+        embedding_backend="fake",
+        embedding_api_key="",
+        embedding_base_url="",
+        embedding_model="",
     )
-    if arguments.backend == "openai_compatible" and (
-        not settings.llm_api_key
-        or not settings.llm_base_url
-        or not settings.llm_model
-        or not settings.embedding_model
-    ):
-        print("未配置完整的 OpenAI-compatible 环境变量，真实模型实验已跳过。")
-        return 0
     runner = BenchmarkRunner(settings=settings, progress=print)
     artifacts = await runner.run(
         BenchmarkConfig(
@@ -153,4 +151,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

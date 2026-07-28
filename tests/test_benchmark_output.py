@@ -23,7 +23,7 @@ def test_json_is_utf8_and_environment_contains_no_secret_values(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("MEMLINK_LLM_API_KEY", "must-not-leak")
+    monkeypatch.setenv("MEMLINK_DEEPSEEK_API_KEY", "must-not-leak")
     environment = collect_environment()
     path = tmp_path / "environment.json"
     write_json(path, environment)
@@ -31,4 +31,3 @@ def test_json_is_utf8_and_environment_contains_no_secret_values(
     payload = path.read_text(encoding="utf-8")
     assert "must-not-leak" not in payload
     assert "python_version" in json.loads(payload)
-

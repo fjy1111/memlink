@@ -43,6 +43,13 @@ class BenchmarkRunner:
         settings: Settings,
         progress: ProgressCallback | None = None,
     ) -> None:
+        if (
+            settings.llm_backend != "fake"
+            or settings.embedding_backend != "fake"
+        ):
+            raise ValueError(
+                "Benchmark 仅允许使用离线 Fake LLM 和 Fake Embedding"
+            )
         self._settings = settings
         self._progress = progress or (lambda message: None)
         self._tasks = self._load_tasks()
@@ -89,7 +96,7 @@ class BenchmarkRunner:
                     task["source_task_id"] for task in self._tasks
                 ],
                 "llm_backend": self._settings.llm_backend,
-                "llm_model": self._settings.llm_model or "fake",
+                "llm_model": "fake",
                 "embedding_backend": self._settings.embedding_backend,
                 "embedding_model": self._settings.embedding_model or "fake",
                 "temperature": self._settings.llm_temperature,
@@ -359,4 +366,3 @@ class BenchmarkRunner:
                     }
                 )
         return tasks
-
