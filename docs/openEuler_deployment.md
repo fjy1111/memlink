@@ -3,6 +3,8 @@
 > 状态：**已完成 openEuler 实机验证**。验证环境为 openEuler
 > 24.03-LTS-SP3 x86_64、Python 3.11.6，解释器为
 > `/home/fjy/memlink/.venv/bin/python`。
+> Windows 静态检查和脚本审阅不能替代实机验证；下文记录的是已经完成的
+> openEuler 实际执行结果。
 
 ## 1. 目标与硬件建议
 
