@@ -1,6 +1,8 @@
 # MemLink 3～5 分钟演示视频脚本
 
-建议总时长约4分30秒。正式录制前先运行 pytest、准备 `benchmarks/results/`，并使用 Fake 模式，避免网络和余额风险。
+建议总时长约4分30秒。正式录制前先运行 pytest、准备
+`benchmarks/results/`。主流程使用 Fake 模式保证可复现；真实 DeepSeek 部分
+展示已经完成的脱敏结果或录像，不在录制现场重复消耗 API。
 
 ## 0:00–0:20 背景与痛点
 
@@ -8,7 +10,7 @@
 - 讲解：普通多 Agent 经常重复传递长 Prompt，缺少能力发现、非文本状态、跨任务记忆和公平实验。
 - 点击：不操作。
 - 应看到：MemLink 项目简介。
-- 避免：不要声称已经在 openEuler 实机通过。
+- 避免：不要把 Windows、openEuler、Fake Benchmark 和 DeepSeek 演示混成同一组结果。
 
 ## 0:20–0:50 架构与四个 Agent
 
@@ -50,19 +52,30 @@
 - 应看到：来自真实 JSON 的表格和图表。
 - 避免：不要把 MessagePack 和 JSON 同时存在误说成总字节下降。
 
-## 3:30–4:00 openEuler
+## 3:30–3:55 真实 DeepSeek 演示
 
-- 屏幕：`docs/openEuler_deployment.md` 和 Linux 脚本。
-- 讲解：脚本覆盖环境创建、测试、Demo、API、Streamlit 和 Benchmark；当前状态为待 openEuler 24.03-LTS-SP3 实机验证。
-- 点击：展示精确命令。
-- 应看到：相对路径、`.venv`、LF 脚本。
-- 避免：在没有真实日志时不要展示“通过”字样或伪造终端。
+- 屏幕：已完成的 structured 终端结果或脱敏录屏。
+- 讲解：`deepseek-v4-pro` 驱动四个 Agent 依次执行，9条消息、估算 Token 1040、
+  JSON 7734 B、MessagePack 7002 B、SemanticState 3次/384 B、记忆命中15条，
+  总耗时约28秒并成功完成。
+- 应看到：后端、模型、四 Agent 轨迹和“API Key 已配置”，看不到密钥内容。
+- 强调：约28秒包含外部网络与模型推理；这是单次真实接入演示，不是300条
+  Benchmark，也不用于声称 structured 一定比 text 更快。
+- 避免：不要打开 `.env`，不要显示请求头、原始密钥或含密钥的日志。
 
-## 4:00–4:30 创新与总结
+## 3:55–4:15 openEuler
+
+- 屏幕：真实 openEuler 验证终端、`docs/openEuler_deployment.md` 和 Linux 脚本。
+- 讲解：openEuler 24.03-LTS-SP3 x86_64、Python 3.11.6 实机执行，
+  `pip check` 无损坏依赖，pytest 为77 passed、1 warning、0失败、0错误。
+- 应看到：`/home/fjy/memlink/.venv/bin/python`、真实测试输出和相对路径脚本。
+- 避免：不要把现有 Windows Fake Benchmark 冒充为 openEuler DeepSeek Benchmark。
+
+## 4:15–4:30 创新与总结
 
 - 屏幕：技术报告创新点与发布清单。
-- 讲解：核心价值是可切换、可验证、可量化，而不是只做聊天 UI；现有数据如实呈现收益和开销。
+- 讲解：核心价值是协议约束、状态传递、结果引用和共享记忆均可切换、验证与
+  量化，而不是只做聊天 UI 或宣称所有场景都更快。
 - 点击：回到 Streamlit 概览。
 - 应看到：完整作品链路。
 - 避免：不要使用未经实验支持的性能百分比。
-

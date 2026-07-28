@@ -1,13 +1,21 @@
-# MemLink 第四阶段测试报告
+# MemLink 最终测试与验证报告
 
 ## 1. 测试环境
 
-- 日期：2026-07-27；
+Windows 开发验证：
+
 - 系统：Windows-10-10.0.26200-SP0，AMD64；
 - 解释器：`D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe`；
-- Python：3.11.15，Anaconda 构建；
-- 默认模型：Fake LLM、Fake Embedding；
-- 网络/付费 API：未使用。
+- Python：3.11.15，Anaconda 构建。
+
+openEuler 实机验证：
+
+- 系统：openEuler 24.03-LTS-SP3 x86_64；
+- 解释器：`/home/fjy/memlink/.venv/bin/python`；
+- Python：3.11.6。
+
+自动测试和 Benchmark 使用 Fake LLM/Fake Embedding，不访问付费 API。DeepSeek
+仅在人工真实演示中使用。
 
 ## 2. 测试范围
 
@@ -67,7 +75,7 @@ pytest 在隔离目录中使用当前解释器启动 text/structured Demo，并�
 ## 11. Windows 最终结果
 
 ```text
-55 passed, 1 warning
+77 passed, 1 warning, 0 failed, 0 errors
 ```
 
 `pip check`：
@@ -78,9 +86,38 @@ No broken requirements found.
 
 ## 12. openEuler 结果
 
-待 openEuler 24.03-LTS-SP3 实机验证。当前只完成 Bash/LF/相对路径的 Windows 静态测试，不能把 Windows 结果写成 openEuler 通过。
+已在 openEuler 24.03-LTS-SP3 x86_64 实机完成验证：
 
-## 13. warning
+```text
+Python 3.11.6
+pip check: No broken requirements found.
+pytest: 77 passed, 1 warning, 0 failed, 0 errors
+```
+
+使用的解释器为 `/home/fjy/memlink/.venv/bin/python`。该结果是 Linux 实机执行
+结果，不是从 Windows 静态检查推断。
+
+## 13. 真实 DeepSeek structured 演示
+
+Windows 和 openEuler 均已完成人工 DeepSeek 入口验证。已记录的一次 structured
+成功结果如下：
+
+| 项目 | 真实结果 |
+| --- | --- |
+| 后端 / 模型 | `deepseek` / `deepseek-v4-pro` |
+| Agent 轨迹 | planner → retriever → executor → reviewer |
+| 消息数量 / 估算 Token | 9 / 1040 |
+| JSON / MessagePack | 7734 B / 7002 B |
+| SemanticState | 3次，共384 B |
+| 共享记忆命中 | 15 |
+| 总耗时 | 28107.309 ms |
+| 任务状态 | 成功完成 |
+| 密钥显示 | 仅“API Key 已配置”，未显示密钥 |
+
+约28秒包括外部网络和真实模型推理耗时。这是单次功能演示，不是多轮性能
+Benchmark，不能用来声称 structured 在所有任务中都比 text 更快。
+
+## 14. warning
 
 唯一 warning：
 
@@ -89,16 +126,26 @@ StarletteDeprecationWarning:
 Using httpx with starlette.testclient is deprecated; install httpx2 instead.
 ```
 
-根据项目约束未安装 `httpx2`，也未大范围升级 FastAPI、Starlette、pytest 或 httpx。warning 不影响当前55项测试。
+根据项目约束未安装 `httpx2`，也未大范围升级 FastAPI、Starlette、pytest 或
+httpx。warning 不影响当前77项测试。
 
-## 14. 已知问题
+## 15. 验证边界与已知问题
 
-- openEuler、真实模型和浏览器人工交互尚需外部验证；
 - 项目中存在本轮开始前已有的 Windows `.venv`，本阶段未使用、创建或删除；
 - Streamlit 是比赛演示界面，不含认证和多人隔离；
-- structured 当前部分性能指标差于 text。
+- structured 在 Fake Benchmark 中部分性能指标差于 text；
+- DeepSeek 单次结果受网络、服务负载和模型推理影响，不能替代300条 Fake
+  Benchmark；
+- 自动测试、Fake Benchmark 与真实 DeepSeek 演示是三套不同验证条件。
 
-## 15. 复现命令
+## 16. 安全与产物
+
+- API Key 只从被 Git 忽略的根目录 `.env` 读取；
+- 测试使用 Fake 或 MockTransport，不读取用户凭据、不访问真实 API；
+- 不提交 `.env`、SQLite 数据库、`.npy` 状态、原始密钥或包含密钥的日志；
+- 不建议使用真实 DeepSeek 运行300条正式 Benchmark。
+
+## 17. 复现命令
 
 ```powershell
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pip check

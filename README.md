@@ -17,7 +17,7 @@ MemLink 是一套面向多智能体协作的低开销通信、非文本状态传
 - embedding 以 NumPy 二进制保存，协议只传递 `semantic_state_id`；
 - SQLite 共享记忆支持关键词、标签和向量检索；
 - 五配置 Benchmark 在隔离数据库和状态目录中公平运行；
-- Windows 开发与 openEuler 24.03-LTS-SP3 部署脚本共存。
+- Windows 开发环境与 openEuler 24.03-LTS-SP3 x86_64 均已完成实际验证。
 
 ## 系统架构
 
@@ -110,7 +110,15 @@ bash scripts/linux/run_demo.sh
 bash scripts/linux/run_benchmark.sh 10
 ```
 
-当前 openEuler 结果仍待实机验证，完整步骤见 [openEuler_deployment.md](docs/openEuler_deployment.md)。
+openEuler 24.03-LTS-SP3 x86_64 已使用 Python 3.11.6 和
+`/home/fjy/memlink/.venv/bin/python` 完成实机验证：
+
+```text
+pip check: No broken requirements found.
+pytest: 77 passed, 1 warning, 0 failed, 0 errors
+```
+
+完整步骤和实测记录见 [openEuler_deployment.md](docs/openEuler_deployment.md)。
 
 ## CLI
 
@@ -171,7 +179,14 @@ D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cl
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cli summarize
 ```
 
-可用实验：`text`、`structured`、`structured_no_memory`、`structured_no_semantic_state`、`structured_no_result_ref`、`ablation`。Benchmark 入口固定使用 Fake LLM 和 Fake Embedding，不访问互联网。结果写入被 Git 忽略的 `benchmarks/results/`。方法与真实结果见 [benchmark_methodology.md](docs/benchmark_methodology.md) 和 [benchmark_report.md](docs/benchmark_report.md)。
+正式矩阵包含 `text`、`structured`、`structured_no_memory`、
+`structured_no_semantic_state`、`structured_no_result_ref` 五种配置；
+`ablation` 是选择完整矩阵的 CLI 别名，不是第六种实验。每组10轮、每轮6个任务，
+共形成300条任务执行记录。Benchmark 入口固定使用 Fake LLM 和 Fake Embedding，
+不访问互联网，用于离线复现、协议开销比较和消融分析。结果写入被 Git 忽略的
+`benchmarks/results/`。方法与真实结果见
+[benchmark_methodology.md](docs/benchmark_methodology.md) 和
+[benchmark_report.md](docs/benchmark_report.md)。
 
 ## 测试
 
@@ -181,6 +196,32 @@ D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cl
 ```powershell
 D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
 ```
+
+Windows 与 openEuler 当前真实结果均为：
+
+```text
+77 passed, 1 warning, 0 failed, 0 errors
+```
+
+## 验证结果与实验边界
+
+需要区分以下四类结果：
+
+1. **Windows 开发验证**：使用指定 Conda Python 完成依赖检查、77项 pytest、
+   Fake 双模式回归和 DeepSeek 人工入口验证。
+2. **openEuler 实机验证**：在 openEuler 24.03-LTS-SP3 x86_64、Python 3.11.6、
+   `/home/fjy/memlink/.venv/bin/python` 下完成依赖、pytest 和 DeepSeek 人工验证。
+3. **Fake Benchmark**：五组配置×10轮×6任务，共300条离线记录，用于可复现的
+   协议开销与消融分析。
+4. **真实 DeepSeek 演示**：用于证明四个 Agent 可以接入真实模型，不替代多轮
+   Benchmark，也不用于推导跨任务性能结论。
+
+一条已完成的 DeepSeek structured 演示使用模型 `deepseek-v4-pro`，执行轨迹为
+`planner -> retriever -> executor -> reviewer`，任务成功完成。该次结果为9条消息、
+估算 Token 1040、JSON 7734 B、MessagePack 7002 B、SemanticState 3次/384 B、
+共享记忆命中15条，总耗时28107.309 ms。约28秒主要包含外部网络和真实模型推理
+耗时，不能与毫秒级 Fake Benchmark 直接比较，也不说明 structured 在所有任务中
+一定比 text 更快。
 
 ## DeepSeek 配置
 
@@ -243,6 +284,7 @@ cd /home/fjy/memlink
 | `MEMLINK_EMBEDDING_*` | 可选 embedding 配置；DeepSeek 演示使用 Fake Embedding |
 
 真实密钥不会进入任务请求、日志、异常、页面输出、指标或 Benchmark。
+真实验证中页面和输出仅显示“API Key 已配置”，没有显示密钥内容。
 
 ## 演示任务
 
@@ -257,7 +299,7 @@ cd /home/fjy/memlink
 - Fake Token 为统一字符估算，不等同厂商 tokenizer；
 - 真实模型性能受提供方网络影响，正式离线结果使用 Fake；
 - structured 在现有真实离线结果中字符、Token 和耗时高于 text；
-- openEuler 脚本尚待实机验证；
+- 单次 DeepSeek 演示只能验证真实模型接入，不能替代多轮 Benchmark；
 - Streamlit 面向演示，不含登录、权限管理和多人隔离。
 
 ## 安全说明
@@ -266,6 +308,7 @@ cd /home/fjy/memlink
 - 不在页面、API 或结果中接收 API Key；
 - `.env`、`.env.*`（`.env.example` 除外）、数据库、状态文件和 Benchmark
   结果默认忽略；
+- 不提交 `.env`、SQLite 数据库、`.npy` 状态、原始 API Key 或包含密钥的日志；
 - SQLite 使用参数化查询，状态读取校验哈希；
 - 只结束明确属于本项目的后台进程。
 

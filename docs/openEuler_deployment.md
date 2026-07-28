@@ -1,6 +1,8 @@
 # openEuler 24.03-LTS-SP3 部署与验证
 
-> 状态：**待 openEuler 实机验证**。本文和脚本已在 Windows 做静态路径、LF 和内容检查，但没有虚构实机通过结论。Windows 静态检查不能替代实机验证。
+> 状态：**已完成 openEuler 实机验证**。验证环境为 openEuler
+> 24.03-LTS-SP3 x86_64、Python 3.11.6，解释器为
+> `/home/fjy/memlink/.venv/bin/python`。
 
 ## 1. 目标与硬件建议
 
@@ -64,7 +66,14 @@ bash scripts/linux/test.sh
 .venv/bin/python -m pytest -q
 ```
 
-需要记录真实通过数量、warning 和失败日志，不能直接沿用 Windows 结果。
+实机记录：
+
+```text
+pip check: No broken requirements found.
+pytest: 77 passed, 1 warning, 0 failed, 0 errors
+```
+
+以上为 openEuler 实际执行结果，不是沿用 Windows 输出。
 
 ## 7. CLI Demo
 
@@ -111,6 +120,10 @@ bash scripts/linux/run_benchmark.sh 10
 ```
 
 这会执行五种配置、两组任务、每种配置10轮，并输出300条任务记录。结果保存在 `benchmarks/results/`，正式提交前需人工检查。
+
+仓库现有正式300条结果来自 Fake 后端可复现实验。openEuler 的依赖、pytest 和
+真实模型入口已实机验证，但不能据此声称又在 openEuler 重跑了300条记录。若需要
+生成 openEuler 专属 Benchmark，必须实际执行上述命令并保留新的环境与原始结果。
 
 ## 11. 防火墙
 
@@ -190,6 +203,26 @@ cd /home/fjy/memlink
 配置不完整或请求失败时入口会返回脱敏错误，不会回退到 Fake。密钥不会保存到
 页面、日志、结果文件或 Benchmark。
 
+已完成的一次真实 structured 演示记录：
+
+```text
+backend: deepseek
+model: deepseek-v4-pro
+trace: planner -> retriever -> executor -> reviewer
+message_count: 9
+estimated_tokens: 1040
+json_bytes: 7734
+messagepack_bytes: 7002
+semantic_state: 3 次，共 384 B
+shared_memory_hits: 15
+total_duration_ms: 28107.309
+status: completed
+api_key_display: 已配置
+```
+
+约28秒属于外部网络和模型推理参与的单次演示耗时，不应与 Fake Benchmark 的
+毫秒级耗时直接比较。该结果证明真实模型接入成功，但不能替代多轮 Benchmark。
+
 ## 18. 常见问题
 
 - venv 失败：确认 Python 发行包包含 `venv`/`ensurepip`；
@@ -199,16 +232,16 @@ cd /home/fjy/memlink
 - 端口占用：使用 `ss -ltnp` 定位，只处理本项目进程；
 - Benchmark 失败：保留原始 JSONL 和完整终端日志，不修改失败记录。
 
-## 19. 实测记录填写
+## 19. 实测记录
 
-实机完成后请填写：
-
-- openEuler 完整版本：待填写；
-- Python 版本：待填写；
-- `pip check`：待填写；
-- pytest 数量和 warning：待填写；
-- text/structured Demo：待填写；
-- API/Streamlit：待填写；
-- Benchmark 记录数与失败数：待填写；
-- 端口和进程清理：待填写；
-- 日志或截图路径：待填写。
+- openEuler 完整版本：openEuler 24.03-LTS-SP3 x86_64；
+- Python 版本：3.11.6；
+- 解释器：`/home/fjy/memlink/.venv/bin/python`；
+- `pip check`：`No broken requirements found.`；
+- pytest：77 passed，1 warning，0 failed，0 errors；
+- DeepSeek structured：`deepseek-v4-pro`，四 Agent 顺序执行并成功完成；
+- DeepSeek 单次耗时：28107.309 ms；
+- API Key：输出中仅显示“已配置”，未出现原始密钥；
+- 正式 Benchmark：现有300条为 Fake 后端可复现实验，不冒充 openEuler
+  DeepSeek Benchmark；
+- 未由本次记录覆盖的 API、Streamlit、端口清理或截图，应以各自真实日志为准。

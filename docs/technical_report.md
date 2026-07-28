@@ -1,8 +1,8 @@
-# MemLink 技术报告初稿
+# MemLink 技术报告
 
 ## 1. 摘要
 
-MemLink 面向多智能体协作中的重复文本传输、角色边界模糊、非文本状态缺失和经验无法跨任务复用等问题，实现 text/structured 双模式、capability 驱动路由、SemanticState、SQLite 共享记忆和可消融 Benchmark。系统提供 FastAPI、CLI、Streamlit，并准备 Windows 与 openEuler 部署路径。
+MemLink 面向多智能体协作中的重复文本传输、角色边界模糊、非文本状态缺失和经验无法跨任务复用等问题，实现 text/structured 双模式、capability 驱动路由、SemanticState、SQLite 共享记忆和可消融 Benchmark。系统提供 FastAPI、CLI、Streamlit，并已完成 Windows 与 openEuler 实际验证。
 
 ## 2. 关键词
 
@@ -50,11 +50,22 @@ FastAPI 提供健康、运行和查询接口；CLI 提供双模式 Demo 与 Benc
 
 ## 13. Benchmark 设计
 
-五种配置使用相同任务、顺序、Fake 客户端、seed、轮数、温度、超时和重试。每种配置有独立临时数据库与状态目录。正式 Windows 实验产生300条记录。
+五种配置使用相同任务、顺序、Fake 客户端、seed、轮数、温度、超时和重试。
+每种配置有独立临时数据库与状态目录。每组10轮、每轮6个任务，正式 Windows
+实验共产生300条记录。选择 Fake 是为了排除网络、计费和模型服务版本波动，
+并保证离线复现；该 Benchmark 不调用 DeepSeek。
 
 ## 14. 实验结果
 
-text 与 structured 均60/60成功。text P50/P95 为27.286/33.587 ms，完整 structured 为48.490/61.698 ms。structured JSON 均值低5.13%，但字符、估算 Token、总传输负载和耗时更高。
+text 与 structured 均60/60成功。text P50/P95 为27.286/33.587 ms，完整
+structured 为48.490/61.698 ms。structured JSON 均值低5.13%，但字符、估算
+Token、总传输负载和耗时更高。
+
+另有一次真实 DeepSeek structured 演示，模型为 `deepseek-v4-pro`，Planner、
+Retriever、Executor、Reviewer 依次执行成功。结果为9条消息、估算 Token 1040、
+JSON 7734 B、MessagePack 7002 B、SemanticState 3次/384 B、共享记忆命中15条、
+总耗时28107.309 ms。约28秒主要包含外部网络和模型推理耗时，是功能验收记录，
+不是性能 Benchmark。
 
 ## 15. 消融实验
 
@@ -66,7 +77,11 @@ text 与 structured 均60/60成功。text P50/P95 为27.286/33.587 ms，完整 s
 
 ## 17. openEuler 适配
 
-六个阶段三脚本和阶段四 UI 脚本使用 Bash、LF、严格模式、相对根目录和 Linux `.venv`。文档覆盖权限、端口、SQLite、状态目录与排错。当前仍待 openEuler 24.03-LTS-SP3 实机验证。
+六个阶段三脚本和阶段四 UI 脚本使用 Bash、LF、严格模式、相对根目录和 Linux
+`.venv`。已在 openEuler 24.03-LTS-SP3 x86_64、Python 3.11.6、
+`/home/fjy/memlink/.venv/bin/python` 下实机验证：`pip check` 无损坏依赖，
+pytest 为77 passed、1 warning、0 failed、0 errors。真实 DeepSeek 入口也已完成
+人工验证。
 
 ## 18. 创新点
 
@@ -85,7 +100,10 @@ text 与 structured 均60/60成功。text P50/P95 为27.286/33.587 ms，完整 s
 
 ## 20. 局限性
 
-系统是单机进程内编排；结果引用表和 TaskStore 不持久化；SQLite 向量检索不是大规模索引；Fake Token 不等同模型 tokenizer；真实模型和 openEuler 结果尚未纳入正式报告；Streamlit 不提供生产级认证。
+系统是单机进程内编排；结果引用表和 TaskStore 不持久化；SQLite 向量检索不是
+大规模索引；Fake Token 不等同模型 tokenizer；单次 DeepSeek 结果不能替代多轮
+Benchmark，也不能证明 structured 在所有任务中都更快；Streamlit 不提供生产级
+认证。
 
 ## 21. 后续工作
 
@@ -95,3 +113,7 @@ text 与 structured 均60/60成功。text P50/P95 为27.286/33.587 ms，完整 s
 
 MemLink 已形成从双模式 Agent 编排、状态和记忆，到可复现实验、演示页面和跨平台脚本的完整作品链路。现有数据同时呈现收益和开销，为后续优化提供了可核验基线。
 
+最终结论明确区分：Fake 用于 pytest 与300条可复现 Benchmark；DeepSeek 用于
+真实模型演示；Windows 用于开发与回归验证；openEuler 用于目标平台实机验收。
+structured 的主要价值是协议约束、状态传递、结果引用、证据追踪和共享记忆，
+而不是保证所有任务的字符、Token 或耗时都低于 text。

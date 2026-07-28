@@ -4,6 +4,10 @@
 
 本报告读取 `benchmarks/results/raw_runs.jsonl` 和 `benchmark_summary.json`。正式运行包含300条记录，五种配置各60条，成功率均为100%。环境为 CPython 3.11.15、Windows-10-10.0.26200-SP0、Fake LLM/Fake Embedding、seed 2026。
 
+实验矩阵为五种配置×10轮×每轮6个任务，即每种配置60条、合计300条。该数据
+专门用于可复现的协议开销、稳定性和消融分析；运行过程不访问 DeepSeek 或其他
+互联网模型服务。
+
 ## 2. 总表
 
 | 实验 | 消息 | 字符均值 | Token 均值 | JSON B | MessagePack B | P50/P95 ms | 记忆查询命中率 |
@@ -70,3 +74,14 @@ text P50/P95 为27.286/33.587 ms，structured 为48.490/61.698 ms，分别高77.
 
 当前结果证明结构化协议、非文本状态、共享记忆和消融框架可以真实运行并被量化。`result_ref` 对减少重复结果字节有效；但完整 structured 的字符、估算 Token、总传输负载和耗时均存在额外成本。后续优化应针对 handshake 复用、批量记忆查询、状态缓存和更贴近真实 Prompt 的字符统计，而不是修改数据制造优势。
 
+## 14. 与真实 DeepSeek 演示的区别
+
+另外完成的一次 DeepSeek structured 演示使用 `deepseek-v4-pro`，四个 Agent
+依次执行成功，得到9条消息、估算 Token 1040、JSON 7734 B、MessagePack
+7002 B、SemanticState 3次/384 B、共享记忆命中15条，总耗时28107.309 ms。
+
+这条结果只用于证明真实模型接线、结构化协议、状态传递和共享记忆能够共同运行。
+约28秒主要受外部网络和模型推理影响，不能与 Fake 的毫秒级耗时直接作性能对比，
+也不能替代五组×10轮×6任务的300条离线 Benchmark。项目不宣称 structured
+在所有任务中都比 text 更快；其主要价值是协议约束、能力发现、状态 ID、
+`result_ref`、证据追踪和跨任务共享记忆。

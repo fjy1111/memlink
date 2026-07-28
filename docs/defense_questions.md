@@ -44,9 +44,10 @@ StateStore 保存向量并返回 UUID；消息携带 UUID；下游按需加载�
 ## 11. 是否支持 DeepSeek 和阿里百炼？
 
 项目当前只接入 DeepSeek Chat Completions，不提供多供应商切换。DeepSeek
-仍待维护者使用本地 `.env` 做真实网络验证；SemanticState 在 DeepSeek 演示中
-使用可复现 Fake Embedding。密钥不进入页面输入、日志或结果，pytest 使用
-MockTransport，不调用真实服务。
+已在 Windows 和 openEuler 完成人工真实验证，演示模型为 `deepseek-v4-pro`；
+SemanticState 在 DeepSeek 演示中使用可复现 Fake Embedding。密钥只从被忽略的
+`.env` 读取，不进入页面输入、日志或结果；pytest 使用 MockTransport，不调用
+真实服务。
 
 ## 12. 为什么不用 Redis 或 Milvus？
 
@@ -66,7 +67,11 @@ MockTransport，不调用真实服务。
 
 ## 16. openEuler 适配做了什么？
 
-脚本使用 Bash 严格模式、LF、相对根目录、Linux `.venv`、UTF-8、权限检查，并覆盖 pytest、Demo、API、UI、Benchmark 和环境采集。实机验证仍待完成。
+脚本使用 Bash 严格模式、LF、相对根目录、Linux `.venv`、UTF-8、权限检查，
+并覆盖 pytest、Demo、API、UI、Benchmark 和环境采集。已在 openEuler
+24.03-LTS-SP3 x86_64、Python 3.11.6、
+`/home/fjy/memlink/.venv/bin/python` 下实机验证；`pip check` 无损坏依赖，
+pytest 为77 passed、1 warning、0 failed、0 errors。
 
 ## 17. 项目与操作系统赛道有什么关系？
 
@@ -78,8 +83,25 @@ Executor 只能调用 ToolRegistry 中允许角色为 executor 的两个确定�
 
 ## 19. 当前项目最大局限是什么？
 
-单机进程内结果引用和 TaskStore 不适合分布式恢复；真实模型和 openEuler 尚需实测；当前 structured 固定开销在轻量 Fake 任务中较明显。
+单机进程内结果引用和 TaskStore 不适合分布式恢复；SQLite 向量检索不是大规模
+索引；当前 structured 固定开销在轻量 Fake 任务中较明显；单次真实模型结果受
+网络和服务负载影响，不能替代多轮 Benchmark。
 
 ## 20. 后续如何扩展为分布式系统？
 
 保持 Agent、Registry、StateStore、MemoryStore 接口，逐步替换为带认证的服务端注册、对象存储、持久结果引用和分布式记忆后端，并增加幂等、租约、追踪和一致性策略。
+
+## 21. 真实 DeepSeek 为什么约28秒？能说明 structured 更慢吗？
+
+不能直接下这个结论。该次 `deepseek-v4-pro` structured 演示耗时28107.309 ms，
+包含四个 Agent 的外部网络请求和模型推理。它证明真实接入、JSON 协议、
+SemanticState、result_ref 和共享记忆能够共同运行，但只是单次功能记录。
+text/structured 的可复现比较应看使用相同 Fake 后端、相同任务和相同配置的
+300条 Benchmark，并如实承认现有 structured 在部分指标上开销更高。
+
+## 22. 如何保证 API Key 不泄露？
+
+API Key 只从被 Git 忽略的项目根目录 `.env` 读取；`.env.example` 只有占位符。
+页面和输出只显示“API Key 已配置/未配置”，日志不记录 Authorization、完整
+Prompt 或完整响应。发布时不提交 `.env`、SQLite 数据库、`.npy` 状态、原始密钥
+或包含密钥的日志。
