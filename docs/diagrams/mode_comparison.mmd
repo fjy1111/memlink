@@ -1,0 +1,63 @@
+---
+title: MemLink 双通信模式对比图
+---
+flowchart LR
+    subgraph TEXT_COL["text 模式（baseline）"]
+        direction TB
+        TP["Planner<br/>任务规划"]
+        TR["Retriever<br/>证据检索"]
+        TE["Executor<br/>任务执行"]
+        TV["Reviewer<br/>结果审查"]
+
+        TP -->|"完整自然语言文本"| TR
+        TR -->|"完整自然语言文本"| TE
+        TE -->|"完整自然语言文本"| TV
+
+        T_FEATURES["纯文本逐级传递<br/>无 MessagePack<br/>无 SemanticState<br/>共享记忆复用能力较弱"]
+        T_METRICS["已验证示例指标<br/>消息数：4<br/>MessagePack：0<br/>SemanticState：0"]
+        T_SUMMARY["核心结论<br/>简单直接，适合作为 baseline"]
+
+        TV --> T_FEATURES --> T_METRICS --> T_SUMMARY
+    end
+
+    subgraph STRUCTURED_COL["structured 模式"]
+        direction TB
+        SP["Planner<br/>任务规划"]
+        SR["Retriever<br/>证据检索"]
+        SE["Executor<br/>任务执行"]
+        SV["Reviewer<br/>结果审查"]
+
+        SP -->|"schema / 字段化消息"| SR
+        SR -->|"schema / 字段化消息"| SE
+        SE -->|"schema / 字段化消息"| SV
+
+        S_PROTOCOL["协议结构化<br/>支持 MessagePack：紧凑序列化<br/>支持 result_ref：减少重复上下文"]
+        S_STATE["非文本状态与记忆<br/>支持 SemanticState：state_id 传递<br/>支持 Shared Memory：跨任务复用"]
+        S_METRICS["已验证示例指标<br/>消息数：9<br/>SemanticState：3次 / 384B<br/>共享记忆命中：15"]
+        S_SUMMARY["核心结论<br/>机制完整，适合评测与消融实验"]
+
+        SV --> S_PROTOCOL --> S_STATE --> S_METRICS --> S_SUMMARY
+    end
+
+    TP ~~~ SP
+    T_SUMMARY ~~~ S_SUMMARY
+
+    classDef textAgent fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
+    classDef textFeature fill:#F4F7FB,stroke:#7B8CA5,color:#27364A,stroke-width:1.4px;
+    classDef structuredAgent fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.5px;
+    classDef structuredFeature fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.5px;
+    classDef metric fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
+    classDef textSummary fill:#DCEBFF,stroke:#2563EB,color:#102A56,stroke-width:2px;
+    classDef structuredSummary fill:#D9FBE8,stroke:#16875D,color:#0B422D,stroke-width:2px;
+
+    class TP,TR,TE,TV textAgent;
+    class T_FEATURES textFeature;
+    class SP,SR,SE,SV structuredAgent;
+    class S_PROTOCOL,S_STATE structuredFeature;
+    class T_METRICS,S_METRICS metric;
+    class T_SUMMARY textSummary;
+    class S_SUMMARY structuredSummary;
+
+    style TEXT_COL fill:#F8FBFF,stroke:#8FB7F2,stroke-width:1.5px;
+    style STRUCTURED_COL fill:#F6FFFA,stroke:#72CDA5,stroke-width:1.5px;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;

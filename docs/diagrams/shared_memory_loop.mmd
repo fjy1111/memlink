@@ -1,0 +1,35 @@
+---
+title: 共享记忆复用闭环图
+---
+%% 图示说明：展示 SQLite 共享记忆从检索、复用、审核、写回到后续任务再次命中的闭环。
+flowchart LR
+    TASK["新任务<br/>task_topic + prompt"]
+    QUERY["构造查询<br/>关键词 · 标签 · 向量"]
+    SQLITE[("Shared Memory<br/>SQLite")]
+    SEARCH["三路检索<br/>keyword · tag · vector"]
+    COUNT["命中即更新<br/>usage_count + 1"]
+    HIT["返回可复用记忆<br/>memory_id · summary<br/>confidence"]
+    AGENTS["Agent 复用<br/>规划 · 检索 · 审核"]
+    REVIEW{"Reviewer 确认<br/>should_store_memory"}
+    EXPERIENCE["成功经验<br/>success_experience"]
+    MERGE["写入或去重合并<br/>证据 · 标签 · confidence"]
+    NEXT["后续同主题任务"]
+
+    TASK --> QUERY --> SEARCH
+    SQLITE --> SEARCH
+    SEARCH -->|"命中"| COUNT --> HIT --> AGENTS --> REVIEW
+    SEARCH -->|"未命中"| AGENTS
+    REVIEW -->|"可复用"| EXPERIENCE --> MERGE --> SQLITE
+    REVIEW -->|"不写回"| NEXT
+    SQLITE --> NEXT --> TASK
+
+    classDef task fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef memory fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.5px;
+    classDef agent fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.4px;
+    classDef review fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+
+    class TASK,QUERY,NEXT task;
+    class SQLITE,SEARCH,COUNT,HIT,EXPERIENCE,MERGE memory;
+    class AGENTS agent;
+    class REVIEW review;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;

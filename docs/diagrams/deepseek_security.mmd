@@ -1,0 +1,44 @@
+---
+title: DeepSeek安全接入流程图
+---
+%% 图示说明：展示真实 DeepSeek 配置、HTTPS 调用、脱敏输出，以及 pytest 和 Benchmark 的离线隔离。
+flowchart TD
+    ENV["本地 .env<br/>仅保存真实配置"]
+    IGNORE[".gitignore<br/>忽略 .env / .env.*"]
+    GIT["Git 仓库<br/>不包含 .env"]
+    SETTINGS["Settings<br/>读取 MEMLINK_*"]
+    CHECK{"DeepSeek 配置完整？"}
+    FAIL["安全失败<br/>不回退 Fake"]
+    CLIENT["DeepSeek Client<br/>超时 + 有限重试"]
+    HTTPS["HTTPS<br/>Chat Completions"]
+    DEEPSEEK["DeepSeek API"]
+    REDACT["日志与异常脱敏<br/>不记录 Key / Authorization<br/>不输出完整 Prompt"]
+    STATUS["CLI / API / UI<br/>仅显示已配置 / 未配置"]
+
+    subgraph OFFLINE["离线验证边界"]
+        direction LR
+        PYTEST["pytest<br/>禁用 .env 加载"]
+        MOCK["MockTransport / Fake<br/>阻断真实外网"]
+        BENCH["Benchmark<br/>固定 Fake LLM + Fake Embedding"]
+        PYTEST --> MOCK
+    end
+
+    ENV --> SETTINGS --> CHECK
+    ENV --> IGNORE --> GIT
+    CHECK -->|"否"| FAIL --> STATUS
+    CHECK -->|"是"| CLIENT --> HTTPS --> DEEPSEEK
+    CLIENT --> REDACT
+    DEEPSEEK --> REDACT
+    REDACT --> STATUS
+    classDef secret fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.5px;
+    classDef config fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef secure fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
+    classDef offline fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+    classDef decision fill:#FFFFFF,stroke:#64748B,color:#1E293B,stroke-width:1.4px;
+
+    class ENV secret;
+    class IGNORE,GIT,SETTINGS,CLIENT,HTTPS config;
+    class FAIL,DEEPSEEK,REDACT,STATUS secure;
+    class PYTEST,MOCK,BENCH offline;
+    class CHECK decision;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;

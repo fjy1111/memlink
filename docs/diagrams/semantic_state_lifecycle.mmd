@@ -1,0 +1,45 @@
+---
+title: SemanticState生命周期图
+---
+%% 图示说明：展示 NumPy 语义向量从生成、二进制保存、引用读取到按运行范围清理的生命周期。
+flowchart TD
+    TRIGGER["Retriever / Reviewer<br/>触发语义状态生成"]
+    EMBED["EmbeddingClient<br/>生成一维 NumPy 浮点向量"]
+    VALIDATE["StateStore 校验<br/>ndarray · 维度 · dtype"]
+    SAVE["二进制保存<br/>禁止转为自然语言"]
+
+    subgraph FILES["状态文件"]
+        direction LR
+        NPY[".npy 文件<br/>NumPy 二进制"]
+        META[".json 元数据<br/>state_id · 维度 · dtype<br/>字节数 · SHA-256"]
+    end
+
+    REFERENCE["AgentMessage<br/>只传 state_id"]
+    DOWNSTREAM["下游 Agent<br/>按引用请求读取"]
+    LOAD["StateStore.load<br/>读取 .npy"]
+    VERIFY["完整性校验<br/>维度 · dtype · 字节 · 哈希"]
+    USE["相似度检索 / 路由<br/>不把完整向量放入 Prompt"]
+    SCOPE{"运行范围"}
+    TEMP_CLEAN["pytest / Benchmark<br/>临时目录结束后清理"]
+    RUNTIME_KEEP["普通运行<br/>data/states 持久保存"]
+    MANUAL_CLEAN["停止服务后<br/>按发布清单安全清理"]
+
+    TRIGGER --> EMBED --> VALIDATE --> SAVE
+    SAVE --> NPY
+    SAVE --> META
+    META --> REFERENCE --> DOWNSTREAM --> LOAD
+    NPY --> LOAD
+    LOAD --> VERIFY --> USE --> SCOPE
+    SCOPE -->|"临时运行"| TEMP_CLEAN
+    SCOPE -->|"长期运行"| RUNTIME_KEEP --> MANUAL_CLEAN
+
+    classDef process fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef state fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
+    classDef guard fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
+    classDef cleanup fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+
+    class TRIGGER,EMBED,DOWNSTREAM process;
+    class SAVE,NPY,META,REFERENCE,LOAD,USE state;
+    class VALIDATE,VERIFY,SCOPE guard;
+    class TEMP_CLEAN,RUNTIME_KEEP,MANUAL_CLEAN cleanup;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;

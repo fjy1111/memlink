@@ -28,6 +28,7 @@ data/memory/*.db
 data/memory/*.db-*
 !data/memory/.gitkeep
 benchmarks/results/
+benchmarks/evidence_results/
 
 # IDE and OS
 .idea/

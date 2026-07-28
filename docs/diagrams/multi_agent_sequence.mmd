@@ -1,0 +1,68 @@
+---
+title: MemLink多智能体协作时序图
+---
+%% 图示说明：展示一次任务从入口到四个 Agent、状态、记忆和指标落盘的真实协作顺序。
+sequenceDiagram
+    autonumber
+    actor USER as 用户
+    participant ENTRY as CLI / FastAPI / Streamlit
+    participant ORCH as Orchestrator
+    participant REG as AgentRegistry
+    participant PLAN as Planner
+    participant RET as Retriever
+    participant EXEC as Executor
+    participant REV as Reviewer
+    participant STATE as SemanticState Store
+    participant MEMORY as Shared Memory
+    participant LLM as LLM Backend
+    participant METRICS as Metrics
+
+    USER->>ENTRY: 提交任务与通信模式
+    ENTRY->>ORCH: 创建 Task
+    ORCH->>MEMORY: 关键词 / 标签检索
+
+    opt structured + SemanticState
+        ORCH->>STATE: 保存查询 NumPy 向量
+        STATE-->>ORCH: state_id
+        ORCH->>MEMORY: 向量相似度检索
+    end
+    MEMORY-->>ORCH: memory_id + summary
+
+    ORCH->>REG: handshake + 能力发现
+    REG-->>ORCH: task_planning → Planner
+    ORCH->>PLAN: 原始任务 + 记忆摘要 + state_id
+    PLAN->>LLM: 生成计划
+    LLM-->>PLAN: TaskPlan
+    PLAN-->>ORCH: 计划 / plan_ref
+
+    ORCH->>REG: 发现 knowledge_retrieval
+    REG-->>ORCH: Retriever
+    ORCH->>RET: Planner → Retriever<br/>plan_ref + state_id
+    RET->>LLM: 整理证据
+    LLM-->>RET: EvidenceBundle
+    RET-->>ORCH: 证据 / evidence_ref
+
+    ORCH->>REG: 发现 safe_execution
+    REG-->>ORCH: Executor
+    ORCH->>EXEC: Retriever → Executor<br/>evidence_ref + state_id
+    EXEC->>LLM: 生成执行结果
+    LLM-->>EXEC: ExecutionResult
+    EXEC-->>ORCH: 结果 / execution_ref
+
+    ORCH->>REG: 发现 evidence_review
+    REG-->>ORCH: Reviewer
+    ORCH->>REV: Executor → Reviewer<br/>execution_ref + 证据 ID
+    REV->>LLM: 审核输出
+    LLM-->>REV: ReviewResult
+    REV-->>ORCH: 审核结论 / review_ref
+
+    opt Reviewer 确认可复用
+        ORCH->>STATE: 保存记忆向量
+        STATE-->>ORCH: memory state_id
+        ORCH->>MEMORY: 写回成功经验
+    end
+    ORCH->>METRICS: 记录消息 / 字节 / 状态 / 命中 / 耗时
+    ORCH-->>ENTRY: TaskResult
+    ENTRY-->>USER: API / CLI / UI 输出
+
+    Note over PLAN,REV: text 传完整文本；structured 传 schema、result_ref 与 state_id

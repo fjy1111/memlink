@@ -1,0 +1,63 @@
+---
+title: Benchmark实验设计图
+---
+%% 图示说明：展示固定任务、五组对照、十轮执行、三百条记录及汇总指标的可复现实验设计。
+flowchart TD
+    TASKS["2 组连续任务场景<br/>企业 RAG 3个 + 企业 API 3个"]
+    ROUND["每轮 6 个任务<br/>固定顺序"]
+    REPEAT["重复 10 轮"]
+    FIXED["固定条件<br/>Fake LLM + Fake Embedding<br/>seed 2026 · 独立临时存储"]
+
+    subgraph MATRIX["5 个实验组"]
+        direction LR
+        TEXT["text"]
+        STRUCT["structured"]
+        NO_MEMORY["structured_<br/>no_memory"]
+        NO_STATE["structured_<br/>no_semantic_state"]
+        NO_REF["structured_<br/>no_result_ref"]
+    end
+
+    RECORDS["5 × 10 × 6<br/>共 300 条任务记录"]
+
+    subgraph METRIC_GROUPS["统一指标"]
+        direction LR
+        QUALITY["完成率 / 错误 / 重试"]
+        LATENCY["耗时<br/>P50 · P95 · 标准差"]
+        COMM["字符 / Token<br/>JSON / MessagePack 字节"]
+        MEMORY["记忆命中<br/>重复检索"]
+        RESOURCE["资源清理<br/>SQLite · 状态文件 · 后台进程"]
+    end
+
+    OUTPUT["原始记录与汇总<br/>JSONL / CSV / JSON"]
+    CONCLUSION["对照分析<br/>基线 · 完整方案 · 消融 · 稳定性"]
+
+    TASKS --> ROUND --> REPEAT
+    FIXED --> MATRIX
+    REPEAT --> MATRIX
+    TEXT --> RECORDS
+    STRUCT --> RECORDS
+    NO_MEMORY --> RECORDS
+    NO_STATE --> RECORDS
+    NO_REF --> RECORDS
+    RECORDS --> QUALITY
+    RECORDS --> LATENCY
+    RECORDS --> COMM
+    RECORDS --> MEMORY
+    RECORDS --> RESOURCE
+    QUALITY --> OUTPUT
+    LATENCY --> OUTPUT
+    COMM --> OUTPUT
+    MEMORY --> OUTPUT
+    RESOURCE --> OUTPUT
+    OUTPUT --> CONCLUSION
+
+    classDef input fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef experiment fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
+    classDef metric fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
+    classDef output fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+
+    class TASKS,ROUND,REPEAT,FIXED input;
+    class TEXT,STRUCT,NO_MEMORY,NO_STATE,NO_REF,RECORDS experiment;
+    class QUALITY,LATENCY,COMM,MEMORY,RESOURCE metric;
+    class OUTPUT,CONCLUSION output;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;

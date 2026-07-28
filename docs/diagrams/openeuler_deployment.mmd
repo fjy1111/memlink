@@ -1,0 +1,56 @@
+---
+title: openEuler部署拓扑图
+---
+%% 图示说明：展示代码从 Windows 开发环境进入仓库，再部署到 openEuler 服务、存储和 DeepSeek 的拓扑。
+flowchart LR
+    DEV["Windows 开发<br/>Conda Python 3.11"]
+    REPO["GitHub / GitLink<br/>代码仓库"]
+
+    subgraph OE["openEuler 24.03-LTS-SP3 x86_64"]
+        direction TB
+        SOURCE["MemLink 源码<br/>/home/fjy/memlink"]
+        VENV["Linux .venv<br/>Python 3.11.6"]
+
+        subgraph SERVICES["应用服务"]
+            direction LR
+            FASTAPI["FastAPI / Uvicorn<br/>端口 8000"]
+            STREAMLIT["Streamlit UI<br/>端口 8501"]
+        end
+
+        ORCH["Orchestrator"]
+
+        subgraph STORAGE["本地数据"]
+            direction LR
+            SQLITE[("Shared Memory<br/>SQLite")]
+            STATE["SemanticState<br/>.npy + 元数据"]
+        end
+
+        SOURCE --> VENV
+        VENV --> FASTAPI
+        VENV --> STREAMLIT
+        FASTAPI --> ORCH
+        STREAMLIT --> ORCH
+        ORCH --> SQLITE
+        ORCH --> STATE
+    end
+
+    BROWSER["浏览器 / API 客户端"]
+    DEEPSEEK["DeepSeek API<br/>真实模型演示"]
+
+    DEV -->|"Git 提交 / 拉取"| REPO
+    REPO -->|"clone / pull"| SOURCE
+    BROWSER -->|"HTTP :8000"| FASTAPI
+    BROWSER -->|"HTTP :8501"| STREAMLIT
+    ORCH -->|"HTTPS"| DEEPSEEK
+
+    classDef development fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef service fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
+    classDef storage fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
+    classDef external fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.4px;
+
+    class DEV,REPO,SOURCE,VENV development;
+    class FASTAPI,STREAMLIT,ORCH service;
+    class SQLITE,STATE storage;
+    class BROWSER,DEEPSEEK external;
+    style OE fill:#FAFCFF,stroke:#7B8CA5,stroke-width:1.5px;
+    linkStyle default stroke:#64748B,stroke-width:1.3px;
