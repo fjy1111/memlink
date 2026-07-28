@@ -3,8 +3,19 @@
 import json
 from typing import Any
 
+import altair as alt
+
 from app.models import CommunicationMode, TaskResult
 from app.runtime.orchestrator import TaskOrchestrator
+
+BENCHMARK_EXPERIMENT_LABELS = {
+    "text": "text",
+    "structured": "structured",
+    "structured_no_memory": "no_memory",
+    "structured_no_semantic_state": "no_semantic_state",
+    "structured_no_result_ref": "no_result_ref",
+}
+BENCHMARK_CHART_HEIGHT = 360
 
 
 def summarize(value: Any, limit: int = 260) -> str:
@@ -150,3 +161,92 @@ def benchmark_table_rows(summary: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
     return rows
 
+
+def build_benchmark_chart(
+    rows: list[dict[str, Any]],
+    series: tuple[tuple[str, str], ...],
+    *,
+    y_axis_title: str,
+    axis_format: str | None = None,
+    tooltip_format: str = ",.3f",
+) -> alt.Chart:
+    """Build a screenshot-friendly comparison chart without changing data."""
+
+    values: list[dict[str, Any]] = []
+    display_order: list[str] = []
+    for row in rows:
+        experiment = str(row["experiment"])
+        display_name = BENCHMARK_EXPERIMENT_LABELS.get(
+            experiment,
+            experiment,
+        )
+        if display_name not in display_order:
+            display_order.append(display_name)
+        for field, label in series:
+            values.append(
+                {
+                    "experiment": experiment,
+                    "experiment_display": display_name,
+                    "metric": label,
+                    "value": row[field],
+                }
+            )
+
+    y_axis = alt.Axis(format=axis_format) if axis_format else alt.Axis()
+    return (
+        alt.Chart(alt.Data(values=values))
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "experiment_display:N",
+                title="实验组",
+                sort=display_order,
+                axis=alt.Axis(
+                    labelAngle=0,
+                    labelLimit=170,
+                    labelOverlap=False,
+                    labelPadding=10,
+                    labelFontSize=12,
+                    titlePadding=14,
+                    titleFontSize=13,
+                ),
+            ),
+            xOffset=alt.XOffset("metric:N"),
+            y=alt.Y(
+                "value:Q",
+                title=y_axis_title,
+                axis=y_axis,
+            ),
+            color=alt.Color(
+                "metric:N",
+                title=None,
+                legend=alt.Legend(
+                    orient="top",
+                    direction="horizontal",
+                    labelFontSize=12,
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    "experiment:N",
+                    title="原始 experiment",
+                ),
+                alt.Tooltip("metric:N", title="指标"),
+                alt.Tooltip(
+                    "value:Q",
+                    title="数值",
+                    format=tooltip_format,
+                ),
+            ],
+        )
+        .properties(
+            height=BENCHMARK_CHART_HEIGHT,
+            padding={
+                "left": 5,
+                "right": 15,
+                "top": 10,
+                "bottom": 20,
+            },
+        )
+        .configure_view(strokeWidth=0)
+    )

@@ -11,6 +11,7 @@ from app.models import CommunicationMode, TaskResult
 from app.runtime.orchestrator import OrchestrationError, TaskOrchestrator
 from app.ui.presenter import (
     benchmark_table_rows,
+    build_benchmark_chart,
     build_agent_cards,
     build_memory_rows,
     build_semantic_state_rows,
@@ -306,13 +307,43 @@ def render_benchmark() -> None:
     st.caption(f"数据目录：{payload['results_dir']}")
     st.dataframe(rows, use_container_width=True)
     st.markdown("#### P50 / P95 耗时")
-    st.bar_chart(rows, x="experiment", y=["p50_ms", "p95_ms"])
+    st.altair_chart(
+        build_benchmark_chart(
+            rows,
+            (("p50_ms", "P50"), ("p95_ms", "P95")),
+            y_axis_title="耗时（ms）",
+        ),
+        use_container_width=True,
+    )
     st.markdown("#### 字符与估算 Token")
-    st.bar_chart(rows, x="experiment", y=["characters", "tokens"])
+    st.altair_chart(
+        build_benchmark_chart(
+            rows,
+            (("characters", "字符"), ("tokens", "估算 Token")),
+            y_axis_title="均值",
+        ),
+        use_container_width=True,
+    )
     st.markdown("#### JSON / MessagePack 字节")
-    st.bar_chart(rows, x="experiment", y=["json_bytes", "msgpack_bytes"])
+    st.altair_chart(
+        build_benchmark_chart(
+            rows,
+            (("json_bytes", "JSON"), ("msgpack_bytes", "MessagePack")),
+            y_axis_title="序列化字节（B）",
+        ),
+        use_container_width=True,
+    )
     st.markdown("#### 记忆命中率")
-    st.bar_chart(rows, x="experiment", y="memory_hit_rate")
+    st.altair_chart(
+        build_benchmark_chart(
+            rows,
+            (("memory_hit_rate", "记忆命中率"),),
+            y_axis_title="命中率",
+            axis_format=".0%",
+            tooltip_format=".2%",
+        ),
+        use_container_width=True,
+    )
     stability: dict[str, Any] = payload["stability"]
     st.markdown("#### 连续稳定性")
     stability_columns = st.columns(4)

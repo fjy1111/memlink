@@ -9,7 +9,10 @@ from streamlit.testing.v1 import AppTest
 from app.core.config import PROJECT_ROOT, Settings, get_settings
 from app.models import CommunicationMode
 from app.ui.presenter import (
+    BENCHMARK_CHART_HEIGHT,
+    BENCHMARK_EXPERIMENT_LABELS,
     benchmark_table_rows,
+    build_benchmark_chart,
     build_agent_cards,
     build_memory_rows,
     build_semantic_state_rows,
@@ -181,6 +184,41 @@ def test_benchmark_loader_handles_missing_and_real_files(tmp_path: Path) -> None
     rows = benchmark_table_rows(payload["summary"])
     assert rows[0]["experiment"] == "text"
     assert rows[0]["tokens"] == 25
+
+
+def test_benchmark_chart_uses_horizontal_short_labels_and_raw_tooltip() -> None:
+    rows = [
+        {
+            "experiment": experiment,
+            "p50_ms": index + 1,
+            "p95_ms": index + 2,
+        }
+        for index, experiment in enumerate(BENCHMARK_EXPERIMENT_LABELS)
+    ]
+
+    chart = build_benchmark_chart(
+        rows,
+        (("p50_ms", "P50"), ("p95_ms", "P95")),
+        y_axis_title="耗时（ms）",
+    )
+    specification = chart.to_dict()
+    values = specification["data"]["values"]
+    x_encoding = specification["encoding"]["x"]
+
+    assert x_encoding["axis"]["labelAngle"] == 0
+    assert x_encoding["axis"]["labelOverlap"] is False
+    assert x_encoding["sort"] == list(BENCHMARK_EXPERIMENT_LABELS.values())
+    assert specification["height"] == BENCHMARK_CHART_HEIGHT
+    assert {item["experiment_display"] for item in values} == set(
+        BENCHMARK_EXPERIMENT_LABELS.values()
+    )
+    assert {item["experiment"] for item in values} == set(
+        BENCHMARK_EXPERIMENT_LABELS
+    )
+    assert any(
+        item["field"] == "experiment"
+        for item in specification["encoding"]["tooltip"]
+    )
 
 
 def test_streamlit_page_runs_fake_task_without_shell(
