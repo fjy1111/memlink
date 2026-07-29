@@ -1,45 +1,53 @@
 ---
-title: SemanticState生命周期图
+title: SemanticState 生命周期图
 ---
-%% 图示说明：展示 NumPy 语义向量从生成、二进制保存、引用读取到按运行范围清理的生命周期。
-flowchart TD
-    TRIGGER["Retriever / Reviewer<br/>触发语义状态生成"]
-    EMBED["EmbeddingClient<br/>生成一维 NumPy 浮点向量"]
-    VALIDATE["StateStore 校验<br/>ndarray · 维度 · dtype"]
-    SAVE["二进制保存<br/>禁止转为自然语言"]
-
-    subgraph FILES["状态文件"]
+%% 图示说明：展示 NumPy 状态的生成、二进制保存、state_id 引用、按需恢复、分离计量和清理。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":28,"rankSpacing":30},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"17px","lineColor":"#64748B"}}}%%
+flowchart TB
+    subgraph CREATE_ROW["① 生成与保存"]
         direction LR
-        NPY[".npy 文件<br/>NumPy 二进制"]
-        META[".json 元数据<br/>state_id · 维度 · dtype<br/>字节数 · SHA-256"]
+        CREATE["EmbeddingClient<br/>生成中间状态"]
+        VECTOR["一维 NumPy<br/>浮点向量"]
+        VALIDATE["StateStore 校验<br/>维度 · dtype"]
+        PERSIST["二进制保存<br/>.npy + .json 元数据"]
+        ID["分配 state_id"]
+        CREATE --> VECTOR --> VALIDATE --> PERSIST --> ID
     end
 
-    REFERENCE["AgentMessage<br/>只传 state_id"]
-    DOWNSTREAM["下游 Agent<br/>按引用请求读取"]
-    LOAD["StateStore.load<br/>读取 .npy"]
-    VERIFY["完整性校验<br/>维度 · dtype · 字节 · 哈希"]
-    USE["相似度检索 / 路由<br/>不把完整向量放入 Prompt"]
-    SCOPE{"运行范围"}
-    TEMP_CLEAN["pytest / Benchmark<br/>临时目录结束后清理"]
-    RUNTIME_KEEP["普通运行<br/>data/states 持久保存"]
-    MANUAL_CLEAN["停止服务后<br/>按发布清单安全清理"]
+    subgraph USE_ROW["② 引用与使用"]
+        direction LR
+        MESSAGE["AgentMessage<br/>只携带 state_id"]
+        RECEIVE["下游消息<br/>接收状态引用"]
+        LOAD["运行时按需<br/>StateStore.load"]
+        USE["恢复 NumPy 状态<br/>相似度检索"]
+        MESSAGE --> RECEIVE --> LOAD --> USE
+    end
 
-    TRIGGER --> EMBED --> VALIDATE --> SAVE
-    SAVE --> NPY
-    SAVE --> META
-    META --> REFERENCE --> DOWNSTREAM --> LOAD
-    NPY --> LOAD
-    LOAD --> VERIFY --> USE --> SCOPE
-    SCOPE -->|"临时运行"| TEMP_CLEAN
-    SCOPE -->|"长期运行"| RUNTIME_KEEP --> MANUAL_CLEAN
+    subgraph END_ROW["③ 分离计量与生命周期"]
+        direction LR
+        BINARY["semantic_state_binary_bytes<br/>向量原始二进制"]
+        REFERENCE["state_reference_bytes<br/>state_id UTF-8"]
+        DISTINCT["两种字节<br/>不可混用"]
+        TEMP["隔离实验<br/>临时目录自动清理"]
+        NORMAL["普通运行<br/>保留至安全清理"]
+        BINARY --> DISTINCT
+        REFERENCE --> DISTINCT
+        DISTINCT --> TEMP
+        DISTINCT --> NORMAL
+    end
+
+    ID --> MESSAGE
+    VECTOR -. "原始 nbytes" .-> BINARY
+    MESSAGE -. "引用字符串" .-> REFERENCE
 
     classDef process fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
-    classDef state fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
-    classDef guard fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
-    classDef cleanup fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+    classDef storage fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
+    classDef protocol fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
+    classDef metric fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
+    classDef boundary fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
 
-    class TRIGGER,EMBED,DOWNSTREAM process;
-    class SAVE,NPY,META,REFERENCE,LOAD,USE state;
-    class VALIDATE,VERIFY,SCOPE guard;
-    class TEMP_CLEAN,RUNTIME_KEEP,MANUAL_CLEAN cleanup;
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
+    class CREATE,VECTOR,RECEIVE,USE process;
+    class PERSIST,LOAD storage;
+    class ID,MESSAGE protocol;
+    class BINARY,REFERENCE,DISTINCT metric;
+    class VALIDATE,TEMP,NORMAL boundary;

@@ -1,35 +1,43 @@
 ---
 title: 共享记忆复用闭环图
 ---
-%% 图示说明：展示 SQLite 共享记忆从检索、复用、审核、写回到后续任务再次命中的闭环。
-flowchart LR
-    TASK["新任务<br/>task_topic + prompt"]
-    QUERY["构造查询<br/>关键词 · 标签 · 向量"]
-    SQLITE[("Shared Memory<br/>SQLite")]
-    SEARCH["三路检索<br/>keyword · tag · vector"]
-    COUNT["命中即更新<br/>usage_count + 1"]
-    HIT["返回可复用记忆<br/>memory_id · summary<br/>confidence"]
-    AGENTS["Agent 复用<br/>规划 · 检索 · 审核"]
-    REVIEW{"Reviewer 确认<br/>should_store_memory"}
-    EXPERIENCE["成功经验<br/>success_experience"]
-    MERGE["写入或去重合并<br/>证据 · 标签 · confidence"]
-    NEXT["后续同主题任务"]
+%% 图示说明：展示 SQLite 记忆检索、证据复用、整体审核、写回闭环及复用正确性评价。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":24,"rankSpacing":30},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"16px","lineColor":"#64748B"}}}%%
+flowchart TB
+    CONDITIONS["证据实验四种条件<br/>no_memory：禁用记忆　｜　cold_memory：空库<br/>warm_memory：相关前置任务　｜　irrelevant_memory：无关前置任务"]
 
-    TASK --> QUERY --> SEARCH
-    SQLITE --> SEARCH
-    SEARCH -->|"命中"| COUNT --> HIT --> AGENTS --> REVIEW
-    SEARCH -->|"未命中"| AGENTS
-    REVIEW -->|"可复用"| EXPERIENCE --> MERGE --> SQLITE
-    REVIEW -->|"不写回"| NEXT
-    SQLITE --> NEXT --> TASK
+    subgraph LOOP["检索、复用与写回"]
+        direction LR
+        TASK["新任务"]
+        SQLITE[("SQLite<br/>Shared Memory")]
+        RETRIEVED["检索候选<br/>retrieved_memory_ids<br/>并更新 usage_count"]
+        FILTER["Retriever 筛选<br/>memory evidence"]
+        REUSED["进入证据链<br/>reused_memory_ids"]
+        ACT["Executor 使用<br/>Reviewer 整体审核"]
+        WRITE["成功经验写回<br/>后续任务再检索"]
+        TASK --> SQLITE --> RETRIEVED --> FILTER --> REUSED --> ACT --> WRITE
+        WRITE --> SQLITE
+    end
 
-    classDef task fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
-    classDef memory fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.5px;
+    TRUTH["真值与负对照<br/>expected_memory_ids · irrelevant_memory_ids"]
+    QUALITY["复用正确性<br/>relevant_memory_reused · irrelevant_memory_reused<br/>memory_reuse_precision"]
+    WARNING["解释边界<br/>memory_hit_count 只表示检索命中<br/>不等于正确复用"]
+
+    CONDITIONS --> TASK
+    RETRIEVED --> QUALITY
+    REUSED --> QUALITY
+    TRUTH --> QUALITY --> WARNING
+
+    classDef condition fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef memory fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
+    classDef pipeline fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
     classDef agent fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.4px;
-    classDef review fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+    classDef metric fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
+    classDef warning fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
 
-    class TASK,QUERY,NEXT task;
-    class SQLITE,SEARCH,COUNT,HIT,EXPERIENCE,MERGE memory;
-    class AGENTS agent;
-    class REVIEW review;
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
+    class CONDITIONS condition;
+    class SQLITE,WRITE memory;
+    class TASK,RETRIEVED,FILTER,REUSED pipeline;
+    class ACT agent;
+    class TRUTH,QUALITY metric;
+    class WARNING warning;

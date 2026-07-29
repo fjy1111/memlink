@@ -1,63 +1,27 @@
 ---
-title: Benchmark实验设计图
+title: Benchmark 实验设计图
 ---
-%% 图示说明：展示固定任务、五组对照、十轮执行、三百条记录及汇总指标的可复现实验设计。
-flowchart TD
-    TASKS["2 组连续任务场景<br/>企业 RAG 3个 + 企业 API 3个"]
-    ROUND["每轮 6 个任务<br/>固定顺序"]
-    REPEAT["重复 10 轮"]
-    FIXED["固定条件<br/>Fake LLM + Fake Embedding<br/>seed 2026 · 独立临时存储"]
+%% 图示说明：汇总基础 Benchmark、上下文增长与记忆复用实验的公平控制、结果隔离和证据口径。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":24,"rankSpacing":34},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"16px","lineColor":"#64748B"}}}%%
+flowchart LR
+    CONTROL["统一控制<br/>Fake LLM + Fake Embedding · 固定 seed<br/>离线 · 确定性 · 隔离临时存储"]
 
-    subgraph MATRIX["5 个实验组"]
-        direction LR
-        TEXT["text"]
-        STRUCT["structured"]
-        NO_MEMORY["structured_<br/>no_memory"]
-        NO_STATE["structured_<br/>no_semantic_state"]
-        NO_REF["structured_<br/>no_result_ref"]
-    end
+    EXPERIMENTS["三部分实验<br/>A｜基础：2类场景 · 每轮6任务<br/>5组 × 10轮 = 300条<br/><br/>B｜上下文增长：3组 · 4规模<br/>10轮 = 120条<br/><br/>C｜记忆复用：2场景 · 4条件<br/>10轮 = 80条目标记录 + 前置任务"]
+    OUTPUTS["结果隔离<br/>benchmarks/results<br/>保留原300条基础结果<br/><br/>benchmarks/evidence_results<br/>新增120条 + 80条证据记录"]
+    METRICS["统一统计与专项证据<br/>success · completion_rate · 错误 · 资源清理<br/>elapsed_ms · P50 · P95 · 标准差<br/>UTF-8 / JSON / MessagePack · repeated_payload_bytes<br/>result_ref saving · 状态二进制 / 引用字节<br/>memory_reuse_precision · irrelevant_memory_reused"]
+    ARTIFACT["CSV · JSON · Markdown<br/>Static Figures"]
+    BOUNDARY["解释边界<br/>不读取 DeepSeek API Key<br/>不是 DeepSeek 性能 Benchmark"]
 
-    RECORDS["5 × 10 × 6<br/>共 300 条任务记录"]
+    CONTROL --> EXPERIMENTS --> OUTPUTS --> METRICS --> ARTIFACT --> BOUNDARY
 
-    subgraph METRIC_GROUPS["统一指标"]
-        direction LR
-        QUALITY["完成率 / 错误 / 重试"]
-        LATENCY["耗时<br/>P50 · P95 · 标准差"]
-        COMM["字符 / Token<br/>JSON / MessagePack 字节"]
-        MEMORY["记忆命中<br/>重复检索"]
-        RESOURCE["资源清理<br/>SQLite · 状态文件 · 后台进程"]
-    end
-
-    OUTPUT["原始记录与汇总<br/>JSONL / CSV / JSON"]
-    CONCLUSION["对照分析<br/>基线 · 完整方案 · 消融 · 稳定性"]
-
-    TASKS --> ROUND --> REPEAT
-    FIXED --> MATRIX
-    REPEAT --> MATRIX
-    TEXT --> RECORDS
-    STRUCT --> RECORDS
-    NO_MEMORY --> RECORDS
-    NO_STATE --> RECORDS
-    NO_REF --> RECORDS
-    RECORDS --> QUALITY
-    RECORDS --> LATENCY
-    RECORDS --> COMM
-    RECORDS --> MEMORY
-    RECORDS --> RESOURCE
-    QUALITY --> OUTPUT
-    LATENCY --> OUTPUT
-    COMM --> OUTPUT
-    MEMORY --> OUTPUT
-    RESOURCE --> OUTPUT
-    OUTPUT --> CONCLUSION
-
-    classDef input fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef control fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
     classDef experiment fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
-    classDef metric fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
+    classDef metric fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
     classDef output fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
+    classDef boundary fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.5px;
 
-    class TASKS,ROUND,REPEAT,FIXED input;
-    class TEXT,STRUCT,NO_MEMORY,NO_STATE,NO_REF,RECORDS experiment;
-    class QUALITY,LATENCY,COMM,MEMORY,RESOURCE metric;
-    class OUTPUT,CONCLUSION output;
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
+    class CONTROL control;
+    class EXPERIMENTS experiment;
+    class METRICS metric;
+    class OUTPUTS,ARTIFACT output;
+    class BOUNDARY boundary;

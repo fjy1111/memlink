@@ -1,63 +1,50 @@
 ---
 title: MemLink 双通信模式对比图
 ---
-flowchart LR
-    subgraph TEXT_COL["text 模式（baseline）"]
-        direction TB
-        TP["Planner<br/>任务规划"]
-        TR["Retriever<br/>证据检索"]
-        TE["Executor<br/>任务执行"]
-        TV["Reviewer<br/>结果审查"]
+%% 图示说明：客观对照 text 完整文本基线与 structured 机制，并引出上下文增长证据实验。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":26,"rankSpacing":30},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"17px","lineColor":"#64748B"}}}%%
+flowchart TB
+    subgraph MODES["双模式客观对比"]
+        direction LR
+        subgraph TEXT_MODE["text｜基线"]
+            direction LR
+            T_FLOW["四 Agent<br/>顺序协作"]
+            T_HANDOFF["完整自然语言<br/>逐级传递"]
+            T_COST["上下文增长<br/>可能重复载荷"]
+            T_USE["无 result_ref / state_id<br/>简单公平基线"]
+            T_FLOW --> T_HANDOFF --> T_COST --> T_USE
+        end
 
-        TP -->|"完整自然语言文本"| TR
-        TR -->|"完整自然语言文本"| TE
-        TE -->|"完整自然语言文本"| TV
-
-        T_FEATURES["纯文本逐级传递<br/>无 MessagePack<br/>无 SemanticState<br/>共享记忆复用能力较弱"]
-        T_METRICS["已验证示例指标<br/>消息数：4<br/>MessagePack：0<br/>SemanticState：0"]
-        T_SUMMARY["核心结论<br/>简单直接，适合作为 baseline"]
-
-        TV --> T_FEATURES --> T_METRICS --> T_SUMMARY
+        subgraph STRUCT_MODE["structured｜机制组"]
+            direction LR
+            S_FLOW["四 Agent<br/>顺序协作"]
+            S_SCHEMA["schema 消息<br/>固定协议开销"]
+            S_MECHANISM["result_ref · state_id<br/>Shared Memory"]
+            S_USE["MessagePack 体积统计<br/>长上下文 / 连续任务 / 消融"]
+            S_FLOW --> S_SCHEMA --> S_MECHANISM --> S_USE
+        end
     end
 
-    subgraph STRUCTURED_COL["structured 模式"]
-        direction TB
-        SP["Planner<br/>任务规划"]
-        SR["Retriever<br/>证据检索"]
-        SE["Executor<br/>任务执行"]
-        SV["Reviewer<br/>结果审查"]
-
-        SP -->|"schema / 字段化消息"| SR
-        SR -->|"schema / 字段化消息"| SE
-        SE -->|"schema / 字段化消息"| SV
-
-        S_PROTOCOL["协议结构化<br/>支持 MessagePack：紧凑序列化<br/>支持 result_ref：减少重复上下文"]
-        S_STATE["非文本状态与记忆<br/>支持 SemanticState：state_id 传递<br/>支持 Shared Memory：跨任务复用"]
-        S_METRICS["已验证示例指标<br/>消息数：9<br/>SemanticState：3次 / 384B<br/>共享记忆命中：15"]
-        S_SUMMARY["核心结论<br/>机制完整，适合评测与消融实验"]
-
-        SV --> S_PROTOCOL --> S_STATE --> S_METRICS --> S_SUMMARY
+    subgraph EVIDENCE["上下文增长证据实验"]
+        direction LR
+        SCALE["规模<br/>1x · 2x · 4x · 8x"]
+        MATRIX["实验组<br/>text · structured<br/>structured_no_result_ref"]
+        OBSERVE["指标<br/>UTF-8 · JSON / MessagePack<br/>重复字节 · 耗时"]
+        HONEST["边界<br/>不宣称 structured<br/>一定更快"]
+        SCALE --> MATRIX --> OBSERVE --> HONEST
     end
 
-    TP ~~~ SP
-    T_SUMMARY ~~~ S_SUMMARY
+    T_USE --> SCALE
+    S_USE --> SCALE
 
-    classDef textAgent fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
-    classDef textFeature fill:#F4F7FB,stroke:#7B8CA5,color:#27364A,stroke-width:1.4px;
-    classDef structuredAgent fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.5px;
-    classDef structuredFeature fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.5px;
-    classDef metric fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.4px;
-    classDef textSummary fill:#DCEBFF,stroke:#2563EB,color:#102A56,stroke-width:2px;
-    classDef structuredSummary fill:#D9FBE8,stroke:#16875D,color:#0B422D,stroke-width:2px;
+    classDef text fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
+    classDef structured fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.5px;
+    classDef evidence fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
+    classDef boundary fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.5px;
 
-    class TP,TR,TE,TV textAgent;
-    class T_FEATURES textFeature;
-    class SP,SR,SE,SV structuredAgent;
-    class S_PROTOCOL,S_STATE structuredFeature;
-    class T_METRICS,S_METRICS metric;
-    class T_SUMMARY textSummary;
-    class S_SUMMARY structuredSummary;
-
-    style TEXT_COL fill:#F8FBFF,stroke:#8FB7F2,stroke-width:1.5px;
-    style STRUCTURED_COL fill:#F6FFFA,stroke:#72CDA5,stroke-width:1.5px;
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
+    class T_FLOW,T_HANDOFF,T_COST,T_USE text;
+    class S_FLOW,S_SCHEMA,S_MECHANISM,S_USE structured;
+    class SCALE,MATRIX,OBSERVE evidence;
+    class HONEST boundary;
+    style TEXT_MODE fill:#F8FBFF,stroke:#8FB7F2,stroke-width:1.5px;
+    style STRUCT_MODE fill:#F6FFFA,stroke:#72CDA5,stroke-width:1.5px;

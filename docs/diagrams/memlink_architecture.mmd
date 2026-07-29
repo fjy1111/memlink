@@ -1,103 +1,33 @@
 ---
 title: MemLink 系统架构图
 ---
-flowchart TD
-    subgraph ENTRY["入口层"]
-        direction LR
-        CLI["CLI"]
-        API["FastAPI"]
-        UI["Streamlit UI"]
-    end
+%% 图示说明：概览入口、编排、四 Agent、双通信模式、状态记忆、模型与评测交付链路。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":24,"rankSpacing":34},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"17px","lineColor":"#64748B"}}}%%
+flowchart LR
+    ENTRY["入口层<br/>CLI · FastAPI<br/>Streamlit UI"]
+    CORE["编排层<br/>Orchestrator<br/>AgentRegistry · TaskStore / Runtime"]
+    AGENTS["Agent 层<br/>Planner → Retriever<br/>→ Executor → Reviewer"]
+    COMM["通信、状态与记忆<br/>text：完整文本<br/>structured：schema · result_ref<br/>MessagePack 体积统计<br/>SemanticState / state_id · SQLite Memory"]
+    EVALUATE["评测层<br/>Metrics · Benchmark<br/>Context Scaling · Memory Reuse"]
+    OUTPUT["交付层<br/>CSV · JSON · Markdown · Static Figures<br/>results：300条<br/>evidence_results：120条 + 80条"]
+    MODEL["模型层<br/>Fake：默认离线、测试与 Benchmark<br/>DeepSeek：人工真实演示"]
 
-    subgraph ORCHESTRATION["编排层"]
-        direction LR
-        ORCH["Orchestrator<br/>任务编排"]
-        REGISTRY["AgentRegistry<br/>能力注册与发现"]
-        RUNTIME["TaskStore / Runtime<br/>任务状态与运行时"]
-    end
+    ENTRY --> CORE --> AGENTS --> COMM --> EVALUATE --> OUTPUT
+    MODEL --> AGENTS
+    MODEL -. "Fake 保证离线复现" .-> EVALUATE
 
-    subgraph AGENTS["Agent 层"]
-        direction LR
-        PLANNER["Planner<br/>规划任务"]
-        RETRIEVER["Retriever<br/>检索证据"]
-        EXECUTOR["Executor<br/>执行任务"]
-        REVIEWER["Reviewer<br/>审查结果"]
-        PLANNER --> RETRIEVER --> EXECUTOR --> REVIEWER
-    end
-
-    subgraph PROTOCOL["通信协议层"]
-        direction LR
-        MODE{"通信模式"}
-        TEXT["text mode<br/>完整文本交接"]
-        STRUCTURED["structured mode<br/>结构化消息"]
-        MSGPACK["MessagePack<br/>紧凑序列化"]
-        RESULT_REF["result_ref<br/>结果引用"]
-        MODE --> TEXT
-        MODE --> STRUCTURED
-        STRUCTURED --> MSGPACK
-        STRUCTURED --> RESULT_REF
-    end
-
-    subgraph STATE_MEMORY["状态与记忆层"]
-        direction LR
-        SEMANTIC["SemanticState<br/>NumPy + state_id"]
-        MEMORY["Shared Memory<br/>SQLite"]
-    end
-
-    subgraph MODEL["模型层"]
-        direction LR
-        MODEL_ADAPTER{"模型后端"}
-        FAKE["Fake LLM<br/>离线测试与可复现 Benchmark"]
-        DEEPSEEK["DeepSeek<br/>真实模型演示"]
-        MODEL_ADAPTER --> FAKE
-        MODEL_ADAPTER --> DEEPSEEK
-    end
-
-    subgraph EVALUATION["评测与展示层"]
-        direction LR
-        METRICS["Metrics<br/>通信与运行指标"]
-        BENCHMARK["Benchmark / Ablation / Stability"]
-        OUTPUT["API / UI 输出结果"]
-        METRICS --> BENCHMARK --> OUTPUT
-    end
-
-    CLI --> ORCH
-    API --> ORCH
-    UI --> ORCH
-    ORCH <--> REGISTRY
-    ORCH <--> RUNTIME
-    ORCH --> PLANNER
-
-    REVIEWER -->|"协作消息与结果"| MODE
-    STRUCTURED --> SEMANTIC
-    STRUCTURED --> MEMORY
-    TEXT --> MODEL_ADAPTER
-    STRUCTURED --> MODEL_ADAPTER
-
-    MSGPACK --> METRICS
-    RESULT_REF --> METRICS
-    SEMANTIC --> METRICS
-    MEMORY --> METRICS
-    FAKE -->|"离线可复现"| BENCHMARK
-    DEEPSEEK -->|"真实模型演示"| OUTPUT
-    REVIEWER -.->|"最终任务结果"| OUTPUT
-
-    classDef entry fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
-    classDef orchestration fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.4px;
-    classDef agent fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.4px;
-    classDef protocol fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
-    classDef storage fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
+    classDef entry fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
+    classDef core fill:#F2ECFF,stroke:#7C4DFF,color:#35205F,stroke-width:1.5px;
+    classDef agent fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.6px;
+    classDef mechanism fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
     classDef model fill:#FFF0F5,stroke:#D9467A,color:#5C1730,stroke-width:1.4px;
-    classDef evaluation fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
-    classDef choice fill:#FFFFFF,stroke:#64748B,color:#1E293B,stroke-width:1.4px;
+    classDef experiment fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
+    classDef path fill:#FFF8E8,stroke:#E6A700,color:#594100,stroke-width:1.3px;
 
-    class CLI,API,UI entry;
-    class ORCH,REGISTRY,RUNTIME orchestration;
-    class PLANNER,RETRIEVER,EXECUTOR,REVIEWER agent;
-    class TEXT,STRUCTURED,MSGPACK,RESULT_REF protocol;
-    class SEMANTIC,MEMORY storage;
-    class FAKE,DEEPSEEK model;
-    class METRICS,BENCHMARK,OUTPUT evaluation;
-    class MODE,MODEL_ADAPTER choice;
-
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
+    class ENTRY entry;
+    class CORE core;
+    class AGENTS agent;
+    class COMM mechanism;
+    class MODEL model;
+    class EVALUATE experiment;
+    class OUTPUT path;

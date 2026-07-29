@@ -1,56 +1,71 @@
 ---
-title: openEuler部署拓扑图
+title: openEuler 部署拓扑图
 ---
-%% 图示说明：展示代码从 Windows 开发环境进入仓库，再部署到 openEuler 服务、存储和 DeepSeek 的拓扑。
+%% 图示说明：展示 Windows/Git 到 openEuler 验证、服务、存储与可选 DeepSeek HTTPS 调用的部署关系。
+%%{init: {"theme":"base","flowchart":{"curve":"basis","nodeSpacing":32,"rankSpacing":38},"themeVariables":{"fontFamily":"Microsoft YaHei, Noto Sans CJK SC, sans-serif","fontSize":"16px","lineColor":"#64748B"}}}%%
 flowchart LR
-    DEV["Windows 开发<br/>Conda Python 3.11"]
-    REPO["GitHub / GitLink<br/>代码仓库"]
+    DEV["Windows 开发机<br/>Conda · Python 3.11"]
+    REPO["代码仓库<br/>GitHub / GitLink"]
 
     subgraph OE["openEuler 24.03-LTS-SP3 x86_64"]
         direction TB
-        SOURCE["MemLink 源码<br/>/home/fjy/memlink"]
-        VENV["Linux .venv<br/>Python 3.11.6"]
+        SOURCE["拉取 MemLink 源码"]
+        ENV["Python 3.11.6<br/>Linux .venv"]
+        INSTALL["安装依赖<br/>pip check"]
 
-        subgraph SERVICES["应用服务"]
+        subgraph VERIFY["本地验证入口"]
             direction LR
-            FASTAPI["FastAPI / Uvicorn<br/>端口 8000"]
-            STREAMLIT["Streamlit UI<br/>端口 8501"]
+            PYTEST["pytest"]
+            CLI["CLI Demo"]
+            BENCH["Benchmark<br/>基础 / 证据实验"]
         end
 
-        ORCH["Orchestrator"]
-
-        subgraph STORAGE["本地数据"]
+        subgraph SERVICE["演示服务"]
             direction LR
-            SQLITE[("Shared Memory<br/>SQLite")]
+            API["FastAPI / Uvicorn<br/>:8000 · /docs"]
+            UI["Streamlit UI<br/>:8501"]
+        end
+
+        subgraph DATA["本地数据"]
+            direction LR
+            SQLITE[("SQLite<br/>Shared Memory")]
             STATE["SemanticState<br/>.npy + 元数据"]
+            METRIC["Metrics / Results"]
         end
 
-        SOURCE --> VENV
-        VENV --> FASTAPI
-        VENV --> STREAMLIT
-        FASTAPI --> ORCH
-        STREAMLIT --> ORCH
-        ORCH --> SQLITE
-        ORCH --> STATE
+        SOURCE --> ENV --> INSTALL
+        INSTALL --> PYTEST
+        INSTALL --> CLI
+        INSTALL --> BENCH
+        INSTALL --> API
+        INSTALL --> UI
+        CLI --> SQLITE
+        CLI --> STATE
+        API --> SQLITE
+        API --> STATE
+        BENCH --> METRIC
     end
 
     BROWSER["浏览器 / API 客户端"]
-    DEEPSEEK["DeepSeek API<br/>真实模型演示"]
+    DEEPSEEK["DeepSeek API<br/>可选真实演示"]
 
-    DEV -->|"Git 提交 / 拉取"| REPO
+    DEV -->|"push"| REPO
     REPO -->|"clone / pull"| SOURCE
-    BROWSER -->|"HTTP :8000"| FASTAPI
-    BROWSER -->|"HTTP :8501"| STREAMLIT
-    ORCH -->|"HTTPS"| DEEPSEEK
+    BROWSER -->|"HTTP :8000"| API
+    BROWSER -->|"HTTP :8501"| UI
+    CLI -. "HTTPS" .-> DEEPSEEK
+    API -. "HTTPS" .-> DEEPSEEK
+    UI -. "HTTPS" .-> DEEPSEEK
 
-    classDef development fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.4px;
+    classDef development fill:#EAF3FF,stroke:#377DFF,color:#16325C,stroke-width:1.5px;
+    classDef verification fill:#EEF2FF,stroke:#6366F1,color:#24265F,stroke-width:1.4px;
     classDef service fill:#ECFDF3,stroke:#22A06B,color:#124B35,stroke-width:1.4px;
     classDef storage fill:#E8FAF8,stroke:#0F9D8A,color:#154A43,stroke-width:1.4px;
     classDef external fill:#FFF4E5,stroke:#F59E0B,color:#5C3A00,stroke-width:1.4px;
 
-    class DEV,REPO,SOURCE,VENV development;
-    class FASTAPI,STREAMLIT,ORCH service;
-    class SQLITE,STATE storage;
+    class DEV,REPO,SOURCE,ENV,INSTALL development;
+    class PYTEST,CLI,BENCH verification;
+    class API,UI service;
+    class SQLITE,STATE,METRIC storage;
     class BROWSER,DEEPSEEK external;
     style OE fill:#FAFCFF,stroke:#7B8CA5,stroke-width:1.5px;
-    linkStyle default stroke:#64748B,stroke-width:1.3px;
