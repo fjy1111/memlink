@@ -6,11 +6,11 @@
 ![openEuler](https://img.shields.io/badge/openEuler-24.03--LTS--SP3-C71A36)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.41+-FF4B4B?logo=streamlit&logoColor=white)
-![pytest](https://img.shields.io/badge/pytest-86%20passed-0A9EDC?logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-tests%20passing-0A9EDC?logo=pytest&logoColor=white)
 
 MemLink不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
 
-本项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可由维护者手工切换到 DeepSeek 完成真实模型演示。
+本项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可通过显式配置切换到 DeepSeek 真实模型后端。
 
 | 评审事实 | 当前实现 |
 | --- | --- |
@@ -18,8 +18,16 @@ MemLink不是普通的多 Agent 聊天演示，而是一套可运行、可测试
 | 双通信模式 | text 基线 / structured 协议 |
 | 非文本状态 | NumPy `float32` + `.npy` + `state_id` |
 | 跨任务记忆 | SQLite Shared Memory |
-| 模型后端 | Fake 默认离线 / DeepSeek 人工演示 |
+| 模型后端 | Fake 默认离线 / DeepSeek 真实模型后端 |
 | 目标平台 | Windows 开发 / openEuler 24.03-LTS-SP3 实机验证 |
+
+## 快速导航
+
+[项目概览](#项目概览) · [核心机制](#核心机制) · [系统架构](#系统架构) · [已验证结果](#已验证结果) · [客观结论](#客观结论) · [快速开始](#快速开始) · [实验复现](#实验复现)
+
+## 评审快速入口
+
+[项目技术说明书](docs/technical_report.md) · [测试报告](docs/test_report.md) · [openEuler 部署说明](docs/openEuler_deployment.md) · [Benchmark 报告](docs/benchmark_report.md)
 
 ## 项目概览
 
@@ -34,7 +42,7 @@ MemLink不是普通的多 Agent 聊天演示，而是一套可运行、可测试
 | 评测方案 | 基础 Benchmark、上下文规模增长实验、共享记忆复用实验 |
 | 服务入口 | CLI、FastAPI、Streamlit |
 | 离线后端 | Fake LLM + Fake Embedding，pytest 与 Benchmark 不访问互联网 |
-| 真实后端 | DeepSeek |
+| 真实后端 | DeepSeek 真实模型后端，通过显式配置启用 |
 | 技术栈 | Python、FastAPI、Pydantic v2、NumPy、MessagePack、SQLite、pytest、Streamlit |
 
 MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项消融开关可分别关闭 Shared Memory、SemanticState 和 `result_ref`，用于观察单一机制对指标的影响。
@@ -86,12 +94,15 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 | 实验组 | 记录数 | 完成率 | 消息均值 | JSON 均值 | MessagePack 均值 | P50 耗时 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | text | 60 | 100% | 4 | 8033.5 B | 0 B | 27.286 ms |
-| structured | 60 | 100% | 9 | 7621.4 B | 6865.5 B | 48.491 ms |
+| structured | 60 | 100% | 9 | 7621.4 B | 6865.5 B | 48.4905 ms |
 | structured_no_memory | 60 | 100% | 9 | 6633.3 B | 5898.3 B | 7.421 ms |
-| structured_no_semantic_state | 60 | 100% | 9 | 7230.4 B | 6481.5 B | 27.194 ms |
+| structured_no_semantic_state | 60 | 100% | 9 | 7230.4 B | 6481.5 B | 27.1935 ms |
 | structured_no_result_ref | 60 | 100% | 9 | 14363.8 B | 13178.1 B | 47.341 ms |
 
+权威数据源是 `benchmarks/results/raw_runs.jsonl` 中的 300 条原始记录。`benchmark_summary.csv` 与 `benchmark_summary.json` 均由同一统计函数汇总；Streamlit Benchmark 页面固定读取后者。当前 text / structured P50 原始值为 27.286 / 48.4905 ms，报告中的三位小数展示属于同一口径。
+
 数据来源：[基础 Benchmark 报告](docs/benchmark_report.md)
+
 ### 通信效率证据实验
 
 上下文规模增长实验使用 `1x / 2x / 4x / 8x` 四档输入，比较 text、structured 与 structured_no_result_ref；每个组合 10 轮，共 **120 条记录**。在当前确定性任务中，`result_ref` 相对完整内联结果的 JSON 字节节省比例从 **56.2%** 增长到 **76.0%**。
@@ -127,6 +138,8 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 
 已完成的 DeepSeek structured 演示使用 `deepseek-v4-pro`，执行轨迹为 planner → retriever → executor → reviewer；记录 9 条消息、估算 Token 1040、JSON 7734 B、MessagePack 7002 B、SemanticState 3 次 / 384 B、共享记忆命中 15 条，总耗时 28107.309 ms。
 
+其中 memory hit 只表示检索命中，不单独证明正确复用；正确复用由共享记忆证据实验中的 `reused_memory_ids`、相关性真值和 Reviewer 接受结果共同验证。
+
 ## 客观结论
 
 1. **`result_ref` 的价值随上下文增长而增强。** 在当前 1x 到 8x 实验中，JSON 字节节省比例由 56.2% 增长到 76.0%。
@@ -135,6 +148,7 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 4. **当前结果尚不能证明共享记忆减少执行步骤。** warm_memory 条件的 `avoided_steps` 仍为 0，项目不据此宣称步骤或载荷已经下降。
 5. **structured 不保证所有任务更快。** 在 Fake 短任务中，structured 的 P50/P95 延迟高于 text，主要价值是协议约束、状态引用、结果引用和可消融评测。
 6. **单次 DeepSeek 结果只证明真实接入可用。** 约 28 秒包含外部网络和模型推理耗时，不能替代多轮离线 Benchmark。
+7. **Fake 不等同于 DeepSeek 性能。** Fake 用于确定性离线复现，其耗时、Token 和输出质量不能外推为真实模型表现。
 
 ## 快速开始
 
@@ -215,4 +229,3 @@ python -m app.benchmark.memory_reuse \
 ```
 
 两项证据实验在目标文件已经存在时默认拒绝覆盖；只有维护者明确希望覆盖指定目录时才添加 `--overwrite`。基础 Benchmark 入口没有覆盖保护，因此复现时必须使用新的 `--results-dir`。
-
