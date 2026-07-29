@@ -2,6 +2,7 @@
 
 import csv
 import json
+import shutil
 from pathlib import Path
 
 import httpx
@@ -9,6 +10,15 @@ import pytest
 from PIL import Image
 
 from app.benchmark.context_scaling import ContextScalingRunner
+from app.benchmark.evidence_charts import (
+    CONDITION_ORDER,
+    CONTEXT_EXPERIMENT_ORDER,
+    CONTEXT_ORDER,
+    FIGURE_NAMES,
+    REQUIRED_RESULT_FILES,
+    generate_evidence_figures_from_results,
+    result_ref_saving_percent,
+)
 from app.benchmark.evidence_common import (
     build_context_task,
     repeated_fragment_bytes,
@@ -29,6 +39,65 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 
 def _json_list(value: str) -> list[str]:
     return [str(item) for item in json.loads(value)]
+
+
+def test_delivery_figures_use_existing_validated_evidence_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbid_network(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("figure generation must not access the network")
+
+    monkeypatch.setattr(httpx.Client, "post", forbid_network)
+    monkeypatch.setattr(httpx.AsyncClient, "post", forbid_network)
+    source = PROJECT_ROOT / "benchmarks" / "evidence_results"
+    evidence_dir = tmp_path / "benchmarks" / "evidence_results"
+    evidence_dir.mkdir(parents=True)
+    for name in REQUIRED_RESULT_FILES:
+        shutil.copy2(source / name, evidence_dir / name)
+
+    protected = tmp_path / "benchmarks" / "results" / "raw_runs.jsonl"
+    protected.parent.mkdir(parents=True)
+    protected.write_text("preserved-300-record-results\n", encoding="utf-8")
+    figures = generate_evidence_figures_from_results(evidence_dir)
+
+    assert [path.name for path in figures] == list(FIGURE_NAMES)
+    assert protected.read_text(encoding="utf-8") == (
+        "preserved-300-record-results\n"
+    )
+    for figure in figures:
+        assert figure.stat().st_size > 0
+        with Image.open(figure) as image:
+            assert image.size == (1600, 900)
+            assert any(
+                minimum < maximum
+                for minimum, maximum in image.convert("RGB").getextrema()
+            )
+
+
+def test_delivery_figure_validation_and_percentage_are_explicit(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(FileNotFoundError, match="directory not found"):
+        generate_evidence_figures_from_results(tmp_path / "missing")
+
+    assert CONTEXT_ORDER == ("1x", "2x", "4x", "8x")
+    assert CONTEXT_EXPERIMENT_ORDER == (
+        "text",
+        "structured",
+        "structured_no_result_ref",
+    )
+    assert CONDITION_ORDER == (
+        "no_memory",
+        "cold_memory",
+        "warm_memory",
+        "irrelevant_memory",
+    )
+    assert result_ref_saving_percent(80.0, 100.0) == pytest.approx(20.0)
+    assert result_ref_saving_percent(120.0, 100.0) == pytest.approx(-20.0)
+    with pytest.raises(ValueError, match="greater than zero"):
+        result_ref_saving_percent(10.0, 0.0)
 
 
 def test_context_generation_is_deterministic_and_semantically_equivalent() -> None:
