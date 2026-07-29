@@ -8,9 +8,9 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.41+-FF4B4B?logo=streamlit&logoColor=white)
 ![pytest](https://img.shields.io/badge/pytest-86%20passed-0A9EDC?logo=pytest&logoColor=white)
 
-MemLink 对应“第三届中国研究生操作系统开源创新大赛”应用创新赛道第 10 题。它不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
+MemLink它不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
 
-项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可由维护者手工切换到 DeepSeek 完成真实模型演示。
+本项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可由维护者手工切换到 DeepSeek 完成真实模型演示。
 
 | 评审事实 | 当前实现 |
 | --- | --- |
@@ -49,7 +49,7 @@ MemLink 对应“第三届中国研究生操作系统开源创新大赛”应用
 | 评测方案 | 基础 Benchmark、上下文规模增长实验、共享记忆复用实验 |
 | 服务入口 | CLI、FastAPI、Streamlit |
 | 离线后端 | Fake LLM + Fake Embedding，pytest 与 Benchmark 不访问互联网 |
-| 真实后端 | DeepSeek，仅用于维护者手工演示，不自动回退到 Fake |
+| 真实后端 | DeepSeek |
 | 技术栈 | Python、FastAPI、Pydantic v2、NumPy、MessagePack、SQLite、pytest、Streamlit |
 
 MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项消融开关可分别关闭 Shared Memory、SemanticState 和 `result_ref`，用于观察单一机制对指标的影响。
