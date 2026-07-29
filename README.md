@@ -1,326 +1,312 @@
 # MemLink
 
-MemLink 是一套面向多智能体协作的低开销通信、非文本状态传递与跨任务共享记忆基础设施，用于“第三届中国研究生操作系统开源创新大赛”应用创新赛道第 10 题。
+> 面向多智能体协作的低开销通信、非文本状态传递与跨任务共享记忆基础设施
 
-> 一句话介绍：让 Planner、Retriever、Executor、Reviewer 在纯文本基线与结构化协议之间可切换，并对通信、状态、记忆和执行成本进行真实、可复现的比较。
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![openEuler](https://img.shields.io/badge/openEuler-24.03--LTS--SP3-C71A36)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.41+-FF4B4B?logo=streamlit&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-86%20passed-0A9EDC?logo=pytest&logoColor=white)
 
-## 解决的问题
+MemLink 对应“第三届中国研究生操作系统开源创新大赛”应用创新赛道第 10 题。它不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
 
-普通多 Agent Demo 往往把所有上下文反复拼进 Prompt，缺少能力发现、证据追踪、非文本状态、跨任务记忆和公平评测。MemLink 提供统一编排层，使这些机制可以独立启停、测量和消融。
+项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可由维护者手工切换到 DeepSeek 完成真实模型演示。
 
-## 核心创新
+| 评审事实 | 当前实现 |
+| --- | --- |
+| 多智能体协作 | Planner → Retriever → Executor → Reviewer |
+| 双通信模式 | text 基线 / structured 协议 |
+| 非文本状态 | NumPy `float32` + `.npy` + `state_id` |
+| 跨任务记忆 | SQLite Shared Memory |
+| 模型后端 | Fake 默认离线 / DeepSeek 人工演示 |
+| 目标平台 | Windows 开发 / openEuler 24.03-LTS-SP3 实机验证 |
 
-- 保留完整 text 基线，同时实现可版本化 structured 协议；
-- 通过 AgentRegistry 按 capability 和 action 校验路由；
-- 同一消息同时统计 JSON 与 MessagePack 的真实序列化字节；
-- 大结果使用 `result_ref` 引用，消融配置可切换为完整结果传输；
-- embedding 以 NumPy 二进制保存，协议只传递 `semantic_state_id`；
-- SQLite 共享记忆支持关键词、标签和向量检索；
-- 五配置 Benchmark 在隔离数据库和状态目录中公平运行；
-- Windows 开发环境与 openEuler 24.03-LTS-SP3 x86_64 均已完成实际验证。
+## 快速导航
+
+- [项目概览](#项目概览)
+- [核心机制](#核心机制)
+- [系统架构](#系统架构)
+- [已验证结果](#已验证结果)
+- [客观结论](#客观结论)
+- [快速开始](#快速开始)
+- [实验复现](#实验复现)
+- [项目结构](#项目结构)
+- [openEuler 实机验证](#openeuler-实机验证)
+- [交付材料](#交付材料)
+- [实验边界](#实验边界)
+- [安全说明](#安全说明)
+
+## 项目概览
+
+| 项目 | 说明 |
+| --- | --- |
+| 核心问题 | 多 Agent 协作中完整上下文重复传递、状态文本化、跨任务经验难复用 |
+| 协作链路 | Planner 规划，Retriever 检索，Executor 执行，Reviewer 审核 |
+| 通信基线 | text 模式逐级传递完整自然语言文本 |
+| 结构化方案 | `AgentMessage`、能力发现、动作字段、证据 ID、`result_ref` |
+| 状态方案 | SemanticState 保存 NumPy 二进制向量，协议只传 `state_id` |
+| 记忆方案 | SQLite 保存事实、证据、策略和成功/失败经验 |
+| 评测方案 | 基础 Benchmark、上下文规模增长实验、共享记忆复用实验 |
+| 服务入口 | CLI、FastAPI、Streamlit |
+| 离线后端 | Fake LLM + Fake Embedding，pytest 与 Benchmark 不访问互联网 |
+| 真实后端 | DeepSeek，仅用于维护者手工演示，不自动回退到 Fake |
+| 技术栈 | Python、FastAPI、Pydantic v2、NumPy、MessagePack、SQLite、pytest、Streamlit |
+
+MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项消融开关可分别关闭 Shared Memory、SemanticState 和 `result_ref`，用于观察单一机制对指标的影响。
+
+## 核心机制
+
+### 1. text 与 structured 双模式
+
+- **text**：四个 Agent 逐级传递完整自然语言文本，作为可解释的基线。
+- **structured**：使用统一 schema 传递动作、参数、能力、置信度、证据 ID、状态 ID 和结果引用。
+- 两种模式使用相同任务、相同 Agent 顺序和相同模型适配层，便于公平比较。
+- `AgentRegistry` 根据 capability 发现 Agent，并校验 action 与目标能力。
+
+### 2. MessagePack 与 result_ref
+
+- structured 消息对同一批数据同时统计 JSON 与 MessagePack 序列化字节。
+- MessagePack 用于紧凑编码体积比较，不把该指标误写成真实网络流量。
+- `result_ref` 让下游只接收稳定引用和必要摘要，避免重复内联大结果。
+- `structured_no_result_ref` 消融组恢复完整结果传递，用于量化引用机制。
+
+### 3. SemanticState 非文本状态
+
+- Retriever 生成 NumPy `float32` 向量，StateStore 以 `.npy` 二进制文件保存。
+- 协议只携带 `state_id`、维度、类型、存储引用和必要元数据。
+- 下游 Agent 按需读取并校验向量，不把完整向量转成字符串写入 Prompt。
+- Benchmark 分别记录状态次数、二进制字节和引用字节。
+
+### 4. SQLite 共享记忆
+
+- 共享记忆与普通聊天历史分离，支持关键词、标签和向量相似度检索。
+- 记忆保存 `memory_id`、摘要、证据、置信度、使用次数和来源 Agent。
+- Reviewer 审核结果后写回可复用经验，后续相关任务可再次检索。
+- 证据实验区分“检索候选”与“实际复用”，避免用命中数替代正确性。
 
 ## 系统架构
 
-```mermaid
-flowchart LR
-    U["API / CLI / Streamlit"] --> O["TaskOrchestrator"]
-    O --> P["Planner"]
-    P --> R["Retriever"]
-    R --> E["Executor"]
-    E --> V["Reviewer"]
-    O <--> G["AgentRegistry"]
-    O <--> S["StateStore / NumPy"]
-    O <--> M["SQLite SharedMemoryStore"]
-    O --> X["MetricsWriter"]
-    X --> B["Benchmark Runner"]
-```
+<p align="center">
+  <img src="docs/diagrams/exports/20_MemLink系统架构图.png" alt="MemLink 系统架构图" width="100%">
+</p>
 
-详细设计见 [architecture.md](docs/architecture.md)。
+入口层将请求交给 Orchestrator；编排器通过 AgentRegistry 发现能力，按 Planner → Retriever → Executor → Reviewer 顺序执行。structured 模式组合 MessagePack、`result_ref`、SemanticState 和 Shared Memory，最终由 Metrics 与 Benchmark 形成 JSON、CSV、Markdown 和静态图。
 
-## 四个 Agent
+- [架构设计说明](docs/architecture.md)
+- [可编辑 Mermaid 源码](docs/diagrams/memlink_architecture.mmd)
+- [全部架构图与流程图索引](docs/diagrams/README.md)
 
-| Agent | 输入 | 输出 | 主要能力 | 工具权限 |
-| --- | --- | --- | --- | --- |
-| Planner | `PlannerInput` | `TaskPlan` | 规划、依赖、风险 | 无 |
-| Retriever | `RetrieverInput` | `EvidenceBundle` | 关键词、标签、向量、记忆检索 | 只读检索 |
-| Executor | `ExecutorInput` | `ExecutionResult` | 安全诊断执行 | `analyze_incident`、`validate_recovery` |
-| Reviewer | `ReviewerInput` | `ReviewResult` | 证据校验、审查、记忆策展 | 无 |
+## 已验证结果
 
-Executor 的工具注册表没有 Shell 或任意代码执行能力。
+### 基础离线 Benchmark
 
-## text 与 structured
+固定随机种子 `2026`，Fake 后端，2 组连续任务场景，每轮 6 个任务，5 个实验组各运行 10 轮，共形成 **300 条任务执行记录**。
 
-- `text`：四次完整自然语言交接，不产生 MessagePack 协议消息。
-- `structured`：使用 `AgentMessage`、capability、action、证据 ID、状态 ID 和结果引用传递上下文。
+| 实验组 | 记录数 | 完成率 | 消息均值 | JSON 均值 | MessagePack 均值 | P50 耗时 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| text | 60 | 100% | 4 | 8033.5 B | 0 B | 27.286 ms |
+| structured | 60 | 100% | 9 | 7621.4 B | 6865.5 B | 48.491 ms |
+| structured_no_memory | 60 | 100% | 9 | 6633.3 B | 5898.3 B | 7.421 ms |
+| structured_no_semantic_state | 60 | 100% | 9 | 7230.4 B | 6481.5 B | 27.194 ms |
+| structured_no_result_ref | 60 | 100% | 9 | 14363.8 B | 13178.1 B | 47.341 ms |
 
-两种模式调用相同任务和模型适配器。通信差异见 [protocol_design.md](docs/protocol_design.md)。
+数据来源：[基础 Benchmark 报告](docs/benchmark_report.md) · [原始结果目录说明](benchmarks/README.md)
 
-## SemanticState
+### 通信效率证据实验
 
-Fake 或真实 embedding 返回一维 `float32` NumPy 数组。StateStore 保存 `.npy` 与元数据，校验维度、dtype、字节数和 SHA-256。消息只传递状态 ID，不把向量转成字符串放入 Prompt。详见 [semantic_state_design.md](docs/semantic_state_design.md)。
+上下文规模增长实验使用 `1x / 2x / 4x / 8x` 四档输入，比较 text、structured 与 structured_no_result_ref；每个组合 10 轮，共 **120 条记录**。在当前确定性任务中，`result_ref` 相对完整内联结果的 JSON 字节节省比例从 **56.2%** 增长到 **76.0%**。
 
-## 共享记忆
+<p align="center">
+  <img src="benchmarks/evidence_results/figures/E03_result_ref节省比例.png" alt="result_ref 节省比例" width="92%">
+</p>
 
-SQLite 记忆与聊天历史分离。验证通过的结果可形成事实、证据、策略、成功或失败经验；后续同主题任务通过关键词、标签或向量相似度检索复用。详见 [memory_design.md](docs/memory_design.md)。
+### 共享记忆复用证据实验
 
-## 目录结构
+共享记忆实验覆盖 RAG 与 API 两个场景，以及 no_memory、cold_memory、warm_memory、irrelevant_memory 四种条件；每种条件 10 轮，共 **80 条目标任务记录**。warm_memory 的正确复用率和复用精确率均为 **100%**，irrelevant_memory 的无关记忆误用率为 **0%**。
 
-```text
-app/
-├─ agents/       四个 Agent 及独立输入输出契约
-├─ api/          FastAPI 路由
-├─ benchmark/    实验矩阵、Runner、统计和输出
-├─ core/         配置与日志
-├─ llm/          Fake/DeepSeek 适配器
-├─ memory/       SQLite 共享记忆
-├─ models/       API 与运行领域模型
-├─ protocol/     AgentMessage 与 AgentRegistry
-├─ runtime/      编排器、指标、任务存储和安全工具
-├─ state/        SemanticState 与二进制状态仓库
-└─ ui/           Streamlit 演示页面与 presenter
-benchmarks/      Benchmark 说明和运行结果目录
-data/            示例任务及运行时数据
-docs/            比赛交付文档
-scripts/linux/   openEuler 脚本
-tests/           离线单元与集成测试
-```
+<p align="center">
+  <img src="benchmarks/evidence_results/figures/E05_共享记忆复用正确性.png" alt="共享记忆复用正确性" width="92%">
+</p>
 
-## 技术栈
+完整证据图：
 
-Python 3.11、FastAPI、Pydantic v2、pydantic-settings、SQLite、NumPy、MessagePack、httpx、pytest、Streamlit。
+- [E01：上下文规模与通信载荷](benchmarks/evidence_results/figures/E01_上下文规模与通信载荷.png)
+- [E02：上下文规模与重复传输](benchmarks/evidence_results/figures/E02_上下文规模与重复传输.png)
+- [E03：result_ref 节省比例](benchmarks/evidence_results/figures/E03_result_ref节省比例.png)
+- [E04：共享记忆条件对比](benchmarks/evidence_results/figures/E04_共享记忆条件对比.png)
+- [E05：共享记忆复用正确性](benchmarks/evidence_results/figures/E05_共享记忆复用正确性.png)
+- [E06：重复步骤与重复载荷](benchmarks/evidence_results/figures/E06_重复步骤与重复载荷.png)
 
-## Windows 安装与运行
+实验定义、字段口径与局限见 [通信与共享记忆证据实验](docs/evidence_experiments.md)。
 
-只使用指定 Conda 解释器，不使用项目 `.venv`：
+### 测试与真实模型验证
 
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pip install -r requirements-dev.txt
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pip check
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
-```
+| 验证环境 | 真实结果 | 说明 |
+| --- | --- | --- |
+| Windows 当前工作树 | 86 passed，1 warning | 指定 Python 3.11 Conda 环境，全部离线 |
+| openEuler 24.03-LTS-SP3 | 77 passed，1 warning | Python 3.11.6 实机记录 |
+| DeepSeek structured 单次演示 | 成功 | 四 Agent 均调用真实模型，无 Fake 回退 |
 
-## openEuler 安装与运行
+已完成的 DeepSeek structured 演示使用 `deepseek-v4-pro`，执行轨迹为 planner → retriever → executor → reviewer；记录 9 条消息、估算 Token 1040、JSON 7734 B、MessagePack 7002 B、SemanticState 3 次 / 384 B、共享记忆命中 15 条，总耗时 28107.309 ms。
 
-目标为 openEuler 24.03-LTS-SP3 x86_64：
+## 客观结论
+
+1. **`result_ref` 的价值随上下文增长而增强。** 在当前 1x 到 8x 实验中，JSON 字节节省比例由 56.2% 增长到 76.0%。
+2. **MessagePack 对同一 structured 消息集更紧凑。** 基础实验中均值由 JSON 7621.4 B 降至 MessagePack 6865.5 B；这是编码体积差异，不等同于网络吞吐实测。
+3. **共享记忆能被正确复用且未误用无关记忆。** 当前 warm_memory 正确复用率为 100%，无关记忆误用率为 0%。
+4. **当前结果尚不能证明共享记忆减少执行步骤。** warm_memory 条件的 `avoided_steps` 仍为 0，项目不据此宣称步骤或载荷已经下降。
+5. **structured 不保证所有任务更快。** 在 Fake 短任务中，structured 的 P50/P95 延迟高于 text，主要价值是协议约束、状态引用、结果引用和可消融评测。
+6. **单次 DeepSeek 结果只证明真实接入可用。** 约 28 秒包含外部网络和模型推理耗时，不能替代多轮离线 Benchmark。
+
+## 快速开始
+
+以下命令面向 openEuler / Linux。请在已经克隆的仓库根目录执行：
 
 ```bash
 bash scripts/linux/setup.sh
-bash scripts/linux/test.sh
-bash scripts/linux/run_demo.sh
-bash scripts/linux/run_benchmark.sh 10
+source .venv/bin/activate
+python -m pip check
+python -m pytest -q
 ```
 
-openEuler 24.03-LTS-SP3 x86_64 已使用 Python 3.11.6 和
-`/home/fjy/memlink/.venv/bin/python` 完成实机验证：
+运行两种离线模式：
+
+```bash
+python -m app.cli run-demo --mode text --backend fake
+python -m app.cli run-demo --mode structured --backend fake
+```
+
+启动 FastAPI：
+
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+可用接口：
+
+- `GET /health`
+- `POST /api/v1/tasks/run`
+- `GET /api/v1/tasks/{task_id}`
+
+启动 Streamlit：
+
+```bash
+python -m streamlit run app/ui/streamlit_app.py --server.port 8501
+```
+
+等价脚本入口：
+
+```bash
+bash scripts/linux/test.sh
+bash scripts/linux/run_demo.sh
+bash scripts/linux/start.sh
+bash scripts/linux/start_ui.sh
+```
+
+## 实验复现
+
+所有自动化实验固定使用 Fake LLM / Fake Embedding，不读取 DeepSeek 凭据，也不访问真实模型接口。
+
+为保留仓库中已有的 300 条基础结果，请将重跑结果写入新的空目录：
+
+```bash
+python -m app.benchmark.cli run \
+  --rounds 10 \
+  --experiment all \
+  --backend fake \
+  --results-dir benchmarks/reproduced_results
+
+python -m app.benchmark.cli summarize \
+  --results-dir benchmarks/reproduced_results
+```
+
+上下文规模增长实验：
+
+```bash
+python -m app.benchmark.context_scaling \
+  --rounds 10 \
+  --output-dir benchmarks/evidence_reproduced/context
+```
+
+共享记忆复用实验：
+
+```bash
+python -m app.benchmark.memory_reuse \
+  --rounds 10 \
+  --output-dir benchmarks/evidence_reproduced/memory
+```
+
+两项证据实验在目标文件已经存在时默认拒绝覆盖；只有维护者明确希望覆盖指定目录时才添加 `--overwrite`。基础 Benchmark 入口没有覆盖保护，因此复现时必须使用新的 `--results-dir`。
+
+## 项目结构
+
+```text
+app/
+├─ agents/       Planner、Retriever、Executor、Reviewer
+├─ api/          FastAPI 路由
+├─ benchmark/    基础 Benchmark、证据实验、统计与静态图
+├─ core/         配置与日志
+├─ llm/          Fake / DeepSeek 适配器
+├─ memory/       SQLite Shared Memory
+├─ protocol/     AgentMessage 与 AgentRegistry
+├─ runtime/      Orchestrator、TaskStore 与 Metrics
+├─ state/        SemanticState 与 StateStore
+└─ ui/           Streamlit 页面与展示服务
+benchmarks/      实验说明与本地结果目录
+data/            示例任务及运行时数据目录
+docs/            架构、协议、实验、部署与答辩材料
+scripts/linux/   openEuler 安装、测试、启动与实验脚本
+tests/           离线单元测试与集成测试
+```
+
+## openEuler 实机验证
+
+项目已在 **openEuler 24.03-LTS-SP3 x86_64**、Python **3.11.6** 环境完成实机验证：
 
 ```text
 pip check: No broken requirements found.
 pytest: 77 passed, 1 warning, 0 failed, 0 errors
 ```
 
-完整步骤和实测记录见 [openEuler_deployment.md](docs/openEuler_deployment.md)。
+实机还完成了 Fake 双模式演示、FastAPI、Streamlit 和 DeepSeek structured 人工演示。该记录证明当时提交内容在目标系统可运行；后续新增的 Windows 测试仍需在发布前按清单重新执行 openEuler 回归。
 
-## CLI
+详细步骤与原始文字记录见 [openEuler 部署与验证](docs/openEuler_deployment.md)。
 
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text --backend fake
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured --backend fake
-```
+## 交付材料
 
-可附加 `--group rag|api --task-index 1|2|3`。
-
-真实模型仅支持 DeepSeek。先按“DeepSeek 配置”创建本地 `.env`，再运行：
-
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode text --backend deepseek
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.cli run-demo --mode structured --backend deepseek
-```
-
-两种模式都会让 Planner、Retriever、Executor、Reviewer 分别调用一次所选
-LLM 后端。DeepSeek 失败时程序直接返回脱敏错误，不会回退到 Fake。
-
-## API
-
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-
-- `GET /health`
-- `POST /api/v1/tasks/run`
-- `GET /api/v1/tasks/{task_id}`
-
-请求示例：
-
-```json
-{
-  "title": "RAG 服务响应变慢",
-  "prompt": "请区分检索和生成阶段并给出排查方案。",
-  "task_topic": "enterprise-rag",
-  "mode": "structured",
-  "llm_backend": "fake"
-}
-```
-
-## Streamlit 演示
-
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m streamlit run app/ui/streamlit_app.py
-```
-
-页面支持任务输入、示例任务、双模式、Fake/DeepSeek 后端、三个消融开关、四
-Agent 轨迹、通信指标、记忆、SemanticState、Reviewer 结果和阶段三真实
-Benchmark。页面不接受 API Key；选择 DeepSeek 后只显示模型、Base URL 以及
-“API Key 已配置/未配置”状态。
-
-## Benchmark
-
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cli run --rounds 10
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m app.benchmark.cli summarize
-```
-
-正式矩阵包含 `text`、`structured`、`structured_no_memory`、
-`structured_no_semantic_state`、`structured_no_result_ref` 五种配置；
-`ablation` 是选择完整矩阵的 CLI 别名，不是第六种实验。每组10轮、每轮6个任务，
-共形成300条任务执行记录。Benchmark 入口固定使用 Fake LLM 和 Fake Embedding，
-不访问互联网，用于离线复现、协议开销比较和消融分析。结果写入被 Git 忽略的
-`benchmarks/results/`。方法与真实结果见
-[benchmark_methodology.md](docs/benchmark_methodology.md) 和
-[benchmark_report.md](docs/benchmark_report.md)。
-
-## 测试
-
-所有自动测试默认使用 Fake 模型；DeepSeek 客户端测试使用本地
-`httpx.MockTransport`，两者都不访问真实 API：
-
-```powershell
-D:\Users\fjy\AppData\Local\anaconda3\envs\memlink\python.exe -m pytest -q
-```
-
-Windows 与 openEuler 当前真实结果均为：
-
-```text
-77 passed, 1 warning, 0 failed, 0 errors
-```
-
-## 验证结果与实验边界
-
-需要区分以下四类结果：
-
-1. **Windows 开发验证**：使用指定 Conda Python 完成依赖检查、77项 pytest、
-   Fake 双模式回归和 DeepSeek 人工入口验证。
-2. **openEuler 实机验证**：在 openEuler 24.03-LTS-SP3 x86_64、Python 3.11.6、
-   `/home/fjy/memlink/.venv/bin/python` 下完成依赖、pytest 和 DeepSeek 人工验证。
-3. **Fake Benchmark**：五组配置×10轮×6任务，共300条离线记录，用于可复现的
-   协议开销与消融分析。
-4. **真实 DeepSeek 演示**：用于证明四个 Agent 可以接入真实模型，不替代多轮
-   Benchmark，也不用于推导跨任务性能结论。
-
-一条已完成的 DeepSeek structured 演示使用模型 `deepseek-v4-pro`，执行轨迹为
-`planner -> retriever -> executor -> reviewer`，任务成功完成。该次结果为9条消息、
-估算 Token 1040、JSON 7734 B、MessagePack 7002 B、SemanticState 3次/384 B、
-共享记忆命中15条，总耗时28107.309 ms。约28秒主要包含外部网络和真实模型推理
-耗时，不能与毫秒级 Fake Benchmark 直接比较，也不说明 structured 在所有任务中
-一定比 text 更快。
-
-## DeepSeek 配置
-
-Fake 是默认后端，用于 pytest、Benchmark 和离线复现。DeepSeek 只用于人工
-CLI、API 或 Streamlit 演示，真实调用可能产生费用；不建议用真实模型重跑
-现有 300 条正式 Benchmark。
-
-API Key 只能保存在仓库根目录的 `.env`，不能写入源码、测试、README、命令行
-参数或 Streamlit 输入框：
-
-- Windows：`E:\memlink\.env`
-- openEuler：`/home/fjy/memlink/.env`
-
-不要覆盖已有 `.env`。首次配置时可复制 `.env.example`，再在本机编辑：
-
-```dotenv
-MEMLINK_LLM_BACKEND=fake
-MEMLINK_DEEPSEEK_API_KEY=replace-me
-MEMLINK_DEEPSEEK_BASE_URL=replace-with-deepseek-base-url
-MEMLINK_DEEPSEEK_MODEL=replace-with-model-name
-MEMLINK_LLM_TIMEOUT_SECONDS=60
-MEMLINK_LLM_MAX_RETRIES=2
-MEMLINK_LLM_TEMPERATURE=0.2
-MEMLINK_LLM_MAX_TOKENS=1500
-```
-
-其中 API Key、Base URL 和模型名称必须由维护者按当前 DeepSeek 控制台与官方
-文档填写。`.env.example` 只能保留占位符。用以下命令确认真实 `.env` 不会被
-Git 跟踪：
-
-```powershell
-git check-ignore -v .env
-git status --short --ignored .env
-```
-
-openEuler 中先进入固定部署目录再运行：
-
-```bash
-cd /home/fjy/memlink
-.venv/bin/python -m app.cli run-demo --mode text --backend deepseek
-.venv/bin/python -m app.cli run-demo --mode structured --backend deepseek
-```
-
-## 环境变量
-
-| 变量 | 用途 |
+| 材料 | 用途 |
 | --- | --- |
-| `MEMLINK_METRICS_DIR` | 原始任务指标目录 |
-| `MEMLINK_STATE_DIR` | SemanticState 目录 |
-| `MEMLINK_MEMORY_DB_PATH` | SQLite 记忆数据库 |
-| `MEMLINK_ENABLE_*` | 记忆、状态和结果引用开关 |
-| `MEMLINK_LLM_BACKEND` | `fake`（默认）或 `deepseek` |
-| `MEMLINK_DEEPSEEK_API_KEY` | 仅从根目录 `.env` 提供的 DeepSeek 密钥 |
-| `MEMLINK_DEEPSEEK_BASE_URL` | DeepSeek Chat Completions Base URL |
-| `MEMLINK_DEEPSEEK_MODEL` | DeepSeek 模型名称 |
-| `MEMLINK_LLM_TIMEOUT_SECONDS` | 单次请求超时 |
-| `MEMLINK_LLM_MAX_RETRIES` | 429、超时和服务端错误的有限重试次数 |
-| `MEMLINK_LLM_TEMPERATURE` | Chat Completions 温度 |
-| `MEMLINK_LLM_MAX_TOKENS` | 单次 Chat Completions 最大输出 Token |
-| `MEMLINK_EMBEDDING_*` | 可选 embedding 配置；DeepSeek 演示使用 Fake Embedding |
+| [系统架构](docs/architecture.md) | 模块边界、调用关系和部署视图 |
+| [结构化协议设计](docs/protocol_design.md) | AgentMessage、能力发现和消息追踪 |
+| [SemanticState 设计](docs/semantic_state_design.md) | 二进制状态生命周期与安全边界 |
+| [共享记忆设计](docs/memory_design.md) | SQLite 模型、检索、复用和去重 |
+| [Benchmark 方法](docs/benchmark_methodology.md) | 五组实验、公平性与统计口径 |
+| [基础 Benchmark 报告](docs/benchmark_report.md) | 300 条记录的真实汇总 |
+| [证据实验说明](docs/evidence_experiments.md) | 上下文增长与记忆复用实验 |
+| [测试报告](docs/test_report.md) | Windows、openEuler、API、CLI 与 UI 验证 |
+| [技术报告](docs/technical_report.md) | 问题、方案、实现与结论 |
+| [演示视频脚本](docs/demo_video_script.md) | 3～5 分钟演示流程 |
+| [答辩问题](docs/defense_questions.md) | 常见质询与客观回答 |
+| [发布检查清单](docs/release_checklist.md) | 提交前功能、安全和产物核对 |
+| [全部流程图](docs/diagrams/README.md) | 8 张 Mermaid 源图及 PNG / SVG 导出 |
 
-真实密钥不会进入任务请求、日志、异常、页面输出、指标或 Benchmark。
-真实验证中页面和输出仅显示“API Key 已配置”，没有显示密钥内容。
+## 实验边界
 
-## 演示任务
-
-`data/examples/continuous_tasks.json` 提供两组连续任务：
-
-- 企业 RAG：响应变慢、高并发超时、生成阶段延迟；
-- 企业 API：HTTP 500、连接池耗尽、异步任务积压。
-
-## 已知限制
-
-- 当前是单进程、单机轻量实现，不提供分布式一致性；
-- Fake Token 为统一字符估算，不等同厂商 tokenizer；
-- 真实模型性能受提供方网络影响，正式离线结果使用 Fake；
-- structured 在现有真实离线结果中字符、Token 和耗时高于 text；
-- 单次 DeepSeek 演示只能验证真实模型接入，不能替代多轮 Benchmark；
-- Streamlit 面向演示，不含登录、权限管理和多人隔离。
+- 基础 Benchmark、上下文规模实验和共享记忆实验均使用 Fake 后端，目标是离线、确定性和可复现。
+- 300 条基础结果、120 条上下文规模结果、80 条记忆目标记录属于三套独立实验，不能混为同一统计总体。
+- DeepSeek 仅用于人工真实模型演示；单次调用不能替代多轮 Benchmark，也不用于推导普遍性能结论。
+- text 与 structured 在基础实验中使用相同任务；structured 的额外协议字段会在短上下文下形成固定开销。
+- Token 为统一字符口径估算值，不等同于任一模型供应商的 tokenizer 计费结果。
+- MessagePack 指标是同一 structured 消息集合的序列化体积，不表示当前实现发生了跨主机网络传输。
+- `memory_hit_count` 只表示检索命中；正确复用结论来自 `reused_memory_ids`、相关性真值与 Reviewer 接受结果。
+- 当前项目是单机、单进程轻量实现，不声明分布式一致性、多机吞吐或内核级优化能力。
 
 ## 安全说明
 
-- 不提供任意 Shell 执行工具；
-- 不在页面、API 或结果中接收 API Key；
-- `.env`、`.env.*`（`.env.example` 除外）、数据库、状态文件和 Benchmark
-  结果默认忽略；
-- 不提交 `.env`、SQLite 数据库、`.npy` 状态、原始 API Key 或包含密钥的日志；
-- SQLite 使用参数化查询，状态读取校验哈希；
-- 只结束明确属于本项目的后台进程。
-
-## 开源协议
-
-项目采用 [MIT License](LICENSE)。
-
-## 项目截图
-
-提交前需由维护者在最终 Windows 和 openEuler 环境中补充真实截图，建议放入 `docs/images/`：
-
-1. Streamlit 任务与四 Agent 轨迹；
-2. SemanticState 和共享记忆；
-3. Benchmark 图表；
-4. openEuler pytest、Demo 和服务运行证明。
+- Fake 是默认后端；pytest 与 Benchmark 不访问 DeepSeek 或其他付费接口。
+- DeepSeek API Key 只允许从仓库根目录、被 Git 忽略的 `.env` 读取。
+- 页面、CLI 和日志只显示后端、模型、Base URL 以及“API Key 已配置 / 未配置”，不显示密钥内容。
+- 不提交 `.env`、SQLite 数据库、`.npy` 状态、运行日志、原始密钥或包含密钥的截图。
+- `.env.example` 只保留空值或占位符；提交前可用 `git check-ignore -v .env` 和 `git ls-files .env` 复核。
+- Executor 不提供任意 Shell 或任意代码执行工具；SQLite 使用参数化查询，StateStore 校验状态元数据与哈希。
+- 项目采用 [MIT License](LICENSE)。
