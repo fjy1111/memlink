@@ -8,7 +8,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.41+-FF4B4B?logo=streamlit&logoColor=white)
 ![pytest](https://img.shields.io/badge/pytest-86%20passed-0A9EDC?logo=pytest&logoColor=white)
 
-MemLink它不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
+MemLink不是普通的多 Agent 聊天演示，而是一套可运行、可测试、可消融、可量化比较的协作基础设施。
 
 本项目保留完整 text 基线，并实现 structured 协议、二进制语义状态、SQLite 共享记忆和离线 Benchmark；同一业务链路可使用 Fake 后端离线复现，也可由维护者手工切换到 DeepSeek 完成真实模型演示。
 
@@ -77,10 +77,6 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 
 入口层将请求交给 Orchestrator；编排器通过 AgentRegistry 发现能力，按 Planner → Retriever → Executor → Reviewer 顺序执行。structured 模式组合 MessagePack、`result_ref`、SemanticState 和 Shared Memory，最终由 Metrics 与 Benchmark 形成 JSON、CSV、Markdown 和静态图。
 
-- [架构设计说明](docs/architecture.md)
-- [可编辑 Mermaid 源码](docs/diagrams/memlink_architecture.mmd)
-- [全部架构图与流程图索引](docs/diagrams/README.md)
-
 ## 已验证结果
 
 ### 基础离线 Benchmark
@@ -95,8 +91,7 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 | structured_no_semantic_state | 60 | 100% | 9 | 7230.4 B | 6481.5 B | 27.194 ms |
 | structured_no_result_ref | 60 | 100% | 9 | 14363.8 B | 13178.1 B | 47.341 ms |
 
-数据来源：[基础 Benchmark 报告](docs/benchmark_report.md) · [原始结果目录说明](benchmarks/README.md)
-
+数据来源：[基础 Benchmark 报告](docs/benchmark_report.md)
 ### 通信效率证据实验
 
 上下文规模增长实验使用 `1x / 2x / 4x / 8x` 四档输入，比较 text、structured 与 structured_no_result_ref；每个组合 10 轮，共 **120 条记录**。在当前确定性任务中，`result_ref` 相对完整内联结果的 JSON 字节节省比例从 **56.2%** 增长到 **76.0%**。
@@ -122,15 +117,13 @@ MemLink 将通信、状态、记忆、模型和评测拆为独立模块。三项
 - [E05：共享记忆复用正确性](benchmarks/evidence_results/figures/E05_共享记忆复用正确性.png)
 - [E06：重复步骤与重复载荷](benchmarks/evidence_results/figures/E06_重复步骤与重复载荷.png)
 
-实验定义、字段口径与局限见 [通信与共享记忆证据实验](docs/evidence_experiments.md)。
-
 ### 测试与真实模型验证
 
-| 验证环境 | 真实结果 | 说明 |
-| --- | --- | --- |
+| 验证环境 | 真实结果                | 说明 |
+| --- |---------------------| --- |
 | Windows 当前工作树 | 86 passed，1 warning | 指定 Python 3.11 Conda 环境，全部离线 |
-| openEuler 24.03-LTS-SP3 | 77 passed，1 warning | Python 3.11.6 实机记录 |
-| DeepSeek structured 单次演示 | 成功 | 四 Agent 均调用真实模型，无 Fake 回退 |
+| openEuler 24.03-LTS-SP3 | 86 passed，1 warning | Python 3.11.6 实机记录 |
+| DeepSeek structured 单次演示 | 成功                  | 四 Agent 均调用真实模型，无 Fake 回退 |
 
 已完成的 DeepSeek structured 演示使用 `deepseek-v4-pro`，执行轨迹为 planner → retriever → executor → reviewer；记录 9 条消息、估算 Token 1040、JSON 7734 B、MessagePack 7002 B、SemanticState 3 次 / 384 B、共享记忆命中 15 条，总耗时 28107.309 ms。
 
