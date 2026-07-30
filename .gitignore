@@ -43,3 +43,6 @@ data/memory/*
 # Runtime semantic states
 data/states/*
 !data/states/.gitkeep
+~$*.docx
+~$*.pptx
+~$*.xlsx
