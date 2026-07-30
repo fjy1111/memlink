@@ -1,0 +1,70 @@
+---
+title: MemLink 四 Agent 协作时序图
+---
+%% 论文插图版：只展示四 Agent 顺序协作主干，不展开协议与存储实现。
+%%{init: {
+  "theme": "base",
+  "fontFamily": "Microsoft YaHei, Arial, sans-serif",
+  "themeCSS": ".messageText, text.actor { font-size: 20px !important; font-weight: 500 !important; } .text { font-size: 18px !important; }",
+  "sequence": {
+    "diagramMarginX": 24,
+    "diagramMarginY": 20,
+    "actorMargin": 28,
+    "width": 120,
+    "height": 54,
+    "boxMargin": 10,
+    "boxTextMargin": 8,
+    "noteMargin": 10,
+    "messageMargin": 30,
+    "mirrorActors": false,
+    "bottomMarginAdj": 1,
+    "useMaxWidth": false,
+    "wrap": false
+  },
+  "themeVariables": {
+    "fontFamily": "Microsoft YaHei, Noto Sans CJK SC, sans-serif",
+    "fontSize": "19px",
+    "background": "#FFFFFF",
+    "mainBkg": "#F8FAFC",
+    "primaryColor": "#EAF3FF",
+    "primaryTextColor": "#111827",
+    "primaryBorderColor": "#5B8DEF",
+    "lineColor": "#64748B",
+    "actorBkg": "#EAF3FF",
+    "actorBorder": "#5B8DEF",
+    "actorTextColor": "#111827",
+    "actorLineColor": "#CBD5E1",
+    "signalColor": "#475569",
+    "signalTextColor": "#111827",
+    "labelBoxBkgColor": "#F8FAFC",
+    "labelBoxBorderColor": "#CBD5E1",
+    "labelTextColor": "#111827",
+    "noteBkgColor": "#F8FAFC",
+    "noteBorderColor": "#CBD5E1",
+    "noteTextColor": "#111827",
+    "activationBkgColor": "#DBEAFE",
+    "activationBorderColor": "#5B8DEF",
+    "sequenceNumberColor": "#FFFFFF"
+  }
+}}%%
+sequenceDiagram
+    participant U as 用户 / API
+    participant O as 编排器
+    box rgb(239, 246, 255) 四 Agent 顺序协作
+        participant P as 规划 Agent
+        participant R as 检索 Agent
+        participant E as 执行 Agent
+        participant V as 审核 Agent
+    end
+    participant M as 状态 / 记忆
+
+    U->>O: ① 提交任务
+    activate O
+    O->>P: ② 生成计划
+    O->>R: ③ 检索证据
+    R->>M: ④ 读取记忆
+    O->>E: ⑤ 执行处理
+    O->>V: ⑥ 审核定稿
+    O->>M: ⑦ 写回状态
+    O-->>U: ⑧ 汇总输出
+    deactivate O
