@@ -21,14 +21,6 @@ MemLink不是普通的多 Agent 聊天演示，而是一套可运行、可测试
 | 模型后端 | Fake 默认离线 / DeepSeek 真实模型后端 |
 | 目标平台 | Windows 开发 / openEuler 24.03-LTS-SP3 实机验证 |
 
-## 快速导航
-
-[项目概览](#项目概览) · [核心机制](#核心机制) · [系统架构](#系统架构) · [已验证结果](#已验证结果) · [客观结论](#客观结论) · [快速开始](#快速开始) · [实验复现](#实验复现)
-
-## 评审快速入口
-
-[项目技术说明书](docs/technical_report.md) · [测试报告](docs/test_report.md) · [openEuler 部署说明](docs/openEuler_deployment.md) · [Benchmark 报告](docs/benchmark_report.md)
-
 ## 项目概览
 
 | 项目 | 说明 |
