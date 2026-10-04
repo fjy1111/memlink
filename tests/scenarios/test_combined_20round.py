@@ -20,10 +20,10 @@ from agentipc.scenarios.models import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-KNOWLEDGE_ROOT = PROJECT_ROOT / "scenarios" / "knowledge_chain"
+KNOWLEDGE_ROOT = PROJECT_ROOT / "tests/scenarios" / "knowledge_chain"
 KNOWLEDGE_TASKS_PATH = KNOWLEDGE_ROOT / "tasks.json"
 KNOWLEDGE_DOCUMENTS_ROOT = KNOWLEDGE_ROOT / "knowledge"
-CODEACT_ROOT = PROJECT_ROOT / "scenarios" / "codeact_chain"
+CODEACT_ROOT = PROJECT_ROOT / "tests/scenarios" / "codeact_chain"
 CODEACT_TASKS_PATH = CODEACT_ROOT / "tasks.json"
 
 

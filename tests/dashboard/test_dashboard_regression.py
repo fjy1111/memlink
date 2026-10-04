@@ -53,7 +53,7 @@ def test_dashboard_final_regression_uses_real_mock_benchmark(
     client = TestClient(
         create_app(
             results_root,
-            static_dir=PROJECT_ROOT / "dashboard",
+            static_dir=PROJECT_ROOT / "src" / "agentipc" / "dashboard" / "static",
         )
     )
 

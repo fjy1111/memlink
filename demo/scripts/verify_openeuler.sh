@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 resolve_repo_path() {
     local value="$1"
@@ -57,7 +57,7 @@ select_agentipc() {
     fi
 
     printf '%s\n' \
-        'AgentIPC verify error: installed AgentIPC CLI not found; run scripts/install.sh first' >&2
+        'AgentIPC verify error: installed AgentIPC CLI not found; run demo/scripts/install.sh first' >&2
     return 1
 }
 
@@ -158,7 +158,7 @@ verify_benchmark_outputs() {
     AGENTIPC_BENCHMARK_REPEAT=1 \
     AGENTIPC_BENCHMARK_SEED="$VERIFY_SEED" \
     AGENTIPC_RESULTS_ROOT="$RESULTS_ROOT" \
-        "${SCRIPT_DIR}/run_benchmark.sh" || return $?
+        "${REPO_ROOT}/tests/scripts/run_benchmark.sh" || return $?
 
     shopt -s nullglob
     runs=("${RESULTS_ROOT}"/*-benchmark-smoke)
@@ -189,7 +189,7 @@ verify_benchmark_outputs() {
 
 run_stage openEuler-check "${SCRIPT_DIR}/check_openeuler.sh"
 run_stage doctor "$AGENTIPC_EXEC" doctor
-run_stage tests env AGENTIPC_TEST_LOG_DIR="$TEST_LOG_DIR" "${SCRIPT_DIR}/run_tests.sh"
+run_stage tests env AGENTIPC_TEST_LOG_DIR="$TEST_LOG_DIR" "${REPO_ROOT}/tests/scripts/run_tests.sh"
 run_stage demo "$AGENTIPC_EXEC" demo --provider mock
 run_stage benchmark verify_benchmark_outputs
 

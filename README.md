@@ -4,7 +4,7 @@
 
 **memlink** 是面向 openEuler / 通用 Linux 环境的多智能体协作原型系统，聚焦多 Agent 协作中的三个系统层问题：**通信开销、非文本中间状态交换、跨任务记忆复用**。
 
-> 说明：参赛作品名称为 **memlink**；仓库内部 Python 包名与 CLI 名称沿用早期工程名 `agentipc`。
+> 说明：参赛作品和仓库名称为 **memlink**；为保持工程兼容性，内部 Python 包和源码目录继续使用 `agentipc` / `src/agentipc`，CLI 仍为 `agentipc`，环境变量仍使用 `AGENTIPC_*`。
 
 本项目不是通用 Agent 编排框架，而是围绕比赛赛题要求，提供一套可运行、可验证、可复现的系统层机制与实验环境。
 
@@ -137,7 +137,7 @@ StateHub.resolve_array(...)
 | C | Structured + State | 结构化协议 + StateRef 状态交换 |
 | D | Structured + State + Memory | 完整机制组合，加入共享记忆与复用 |
 
-正式实验与验证材料位于 `tests/`、`tests/evidence/`、`artifacts/` 及相关结果目录中。
+正式实验与验证材料位于 `tests/`、`tests/evidence/`、`tests/evidence/artifacts/` 及相关结果目录中。
 
 ---
 
@@ -198,7 +198,7 @@ git checkout master
 ### 7.1 推荐：一键安装
 
 ```bash
-bash scripts/install.sh
+bash demo/scripts/install.sh
 ```
 
 脚本会检查 Python 版本、创建或复用 `.venv`、安装项目及 `dev,dashboard` 依赖，并安装 `agentipc` CLI。
@@ -277,7 +277,7 @@ agentipc benchmark   --suite smoke   --repeat 3   --seed 42   --provider mock   
 也可以使用：
 
 ```bash
-bash scripts/run_benchmark.sh
+bash tests/scripts/run_benchmark.sh
 ```
 
 ### 9.4 连续任务场景
@@ -285,13 +285,13 @@ bash scripts/run_benchmark.sh
 知识任务：
 
 ```bash
-agentipc run-scenario knowledge   --provider mock   --seed 42   --results-root results   --scenario-root scenarios
+agentipc run-scenario knowledge   --provider mock   --seed 42   --results-root results   --scenario-root tests/scenarios
 ```
 
 CodeAct 任务：
 
 ```bash
-agentipc run-scenario codeact   --provider mock   --seed 42   --results-root results   --scenario-root scenarios
+agentipc run-scenario codeact   --provider mock   --seed 42   --results-root results   --scenario-root tests/scenarios
 ```
 
 ### 9.5 Dashboard
@@ -313,7 +313,7 @@ http://127.0.0.1:8000/
 ### 10.1 完整测试
 
 ```bash
-bash scripts/run_tests.sh
+bash tests/scripts/run_tests.sh
 ```
 
 或：
@@ -325,15 +325,15 @@ python -m pytest -q
 ### 10.2 指定测试
 
 ```bash
-bash scripts/run_tests.sh tests/state
-bash scripts/run_tests.sh tests/memory
-bash scripts/run_tests.sh tests/protocol
+bash tests/scripts/run_tests.sh tests/state
+bash tests/scripts/run_tests.sh tests/memory
+bash tests/scripts/run_tests.sh tests/protocol
 ```
 
 ### 10.3 openEuler 一键验收
 
 ```bash
-bash scripts/verify_openeuler.sh
+bash demo/scripts/verify_openeuler.sh
 ```
 
 验证流程：
@@ -355,7 +355,7 @@ output validation
 ### 10.4 安装包 Smoke Test
 
 ```bash
-bash scripts/package_smoke.sh
+bash demo/scripts/package_smoke.sh
 ```
 
 ---
@@ -367,7 +367,7 @@ bash scripts/package_smoke.sh
 ├── README.md                       项目总说明
 ├── pyproject.toml                  Python 项目与依赖配置
 ├── .env.example                    环境变量示例
-├── configs/                        默认配置
+├── src/agentipc/resources/configs/ 默认配置资源
 ├── src/agentipc/                   核心源代码
 │   ├── agents/                     Planner / Retriever / Executor / Summarizer
 │   ├── artifacts/                  ArtifactStore / ArtifactRef
@@ -378,12 +378,12 @@ bash scripts/package_smoke.sh
 │   ├── runtime/                    多 Agent 运行时
 │   ├── sandbox/                    CodeAct 受限执行
 │   └── state/                      StateHub / StateRef / SharedMemory
-├── scenarios/                      连续 Knowledge / CodeAct 场景
-├── dashboard/                      Dashboard 前端资源
-├── scripts/                        安装、测试、Benchmark、openEuler 验证脚本
+├── tests/scenarios/                连续 Knowledge / CodeAct 场景
+├── tests/scripts/                  测试、Benchmark、正式实验脚本
+├── demo/scripts/                   安装、演示、openEuler 验证脚本
 ├── tests/                          单元、集成与回归测试
 │   └── evidence/                   正式实验与验证证据
-├── artifacts/                      冻结实验产物 / 大对象证据
+├── tests/evidence/artifacts/       冻结实验产物 / 大对象证据
 ├── docs/                           设计文档与比赛提交文档
 ├── demo/                           决赛可验证演示材料
 └── presentation/                   决赛答辩 PPT 与演示视频
@@ -458,13 +458,13 @@ presentation/
 ```bash
 git checkout master
 
-bash scripts/install.sh
+bash demo/scripts/install.sh
 source .venv/bin/activate
 
 agentipc doctor
 agentipc demo --provider mock
 
-bash scripts/run_tests.sh
+bash tests/scripts/run_tests.sh
 
 agentipc benchmark   --suite smoke   --repeat 1   --seed 42   --provider mock   --results-root results
 
@@ -474,7 +474,7 @@ agentipc dashboard   --host 0.0.0.0   --port 8000   --results-dir results
 openEuler 环境下推荐最终执行：
 
 ```bash
-bash scripts/verify_openeuler.sh
+bash demo/scripts/verify_openeuler.sh
 ```
 
 ---

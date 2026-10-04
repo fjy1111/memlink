@@ -16,7 +16,7 @@
 | R10 | metadata 至少含 ID/来源/时间/主题/摘要 | MemoryRecord 强制字段 | `memory/models.py` | validation test |
 | R11 | 关键词/标签/语义检索 | MemoryService hybrid retrieve | `memory/` | search tests |
 | R12 | 跨 Agent / 跨任务复用 | MemoryRef + persistent SQLite | `memory/`, `runtime/` | Task N+1 hit |
-| R13 | 至少2组关联连续任务 | Knowledge Chain + CodeAct Chain | `scenarios/` | 2×10 轮结果 |
+| R13 | 至少2组关联连续任务 | Knowledge Chain + CodeAct Chain | `tests/scenarios/` | 2×10 轮结果 |
 | R14 | 减少重复计算 | Memory 命中后跳过/减少重复检索或工具调用 | `runtime/`, `evaluation/` | repeated work 指标 |
 | R15 | 消息次数 | MetricsCollector | `evaluation/metrics.py` | summary.json |
 | R16 | 文本 token/字符开销 | char 必选，token 可选 | `evaluation/` | summary.json |
@@ -29,9 +29,9 @@
 | R23 | 状态交换模块 | StateHub | `state/` | state tests |
 | R24 | 共享记忆模块 | MemoryService | `memory/` | memory tests |
 | R25 | 评测模块 | BenchmarkRunner | `evaluation/` | benchmark output |
-| R26 | 稳定执行≥10轮 | 每组连续任务 10 轮以上 | `scenarios/` | stability run |
+| R26 | 稳定执行≥10轮 | 每组连续任务 10 轮以上 | `tests/scenarios/` | stability run |
 | R27 | CodeAct 鼓励项 | RestrictedPythonRunner | `sandbox/`, `agents/executor.py` | codeact scenario |
-| R28 | openEuler 24.03-LTS-SP3 | 安装/验证脚本 | `scripts/` | openEuler run log |
+| R28 | openEuler 24.03-LTS-SP3 | 安装/验证脚本 | `tests/scripts/` | openEuler run log |
 | R29 | 完整源码/设计/部署/实验/视频 | 交付清单 | `docs/` | final checklist |
 
 ## 使用规则

@@ -7,7 +7,7 @@ from agentipc.cli import main
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCENARIO_ROOT = PROJECT_ROOT / "scenarios"
+SCENARIO_ROOT = PROJECT_ROOT / "tests/scenarios"
 
 
 def test_all_product_cli_smoke_is_offline_and_uses_external_results_root(

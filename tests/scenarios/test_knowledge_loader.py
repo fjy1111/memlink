@@ -7,7 +7,7 @@ from agentipc.scenarios.knowledge_loader import KnowledgeDocument, load_knowledg
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REAL_KNOWLEDGE_ROOT = PROJECT_ROOT / "scenarios" / "knowledge_chain" / "knowledge"
+REAL_KNOWLEDGE_ROOT = PROJECT_ROOT / "tests/scenarios" / "knowledge_chain" / "knowledge"
 
 
 def _write_markdown(

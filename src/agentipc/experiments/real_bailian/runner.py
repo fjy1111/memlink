@@ -401,11 +401,11 @@ def run_knowledge_mini_calibration(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     tasks = [
         task
-        for task in load_knowledge_tasks(repo_root / "scenarios/knowledge_chain/tasks.json")
+        for task in load_knowledge_tasks(repo_root / "tests/scenarios/knowledge_chain/tasks.json")
         if task.round in (2, 8)
     ]
     _require_rounds(tasks, expected=(2, 8), task_type=KnowledgeTask)
-    documents = load_knowledge_documents(repo_root / "scenarios/knowledge_chain/knowledge")
+    documents = load_knowledge_documents(repo_root / "tests/scenarios/knowledge_chain/knowledge")
     knowledge_data = [
         {
             "document_id": document.document_id,
@@ -506,11 +506,11 @@ def run_codeact_mini_calibration(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     tasks = [
         task
-        for task in load_codeact_tasks(repo_root / "scenarios/codeact_chain/tasks.json")
+        for task in load_codeact_tasks(repo_root / "tests/scenarios/codeact_chain/tasks.json")
         if task.round in (2, 8)
     ]
     _require_rounds(tasks, expected=(2, 8), task_type=CodeActTask)
-    fixture_root = _validate_fixture_root(repo_root / "scenarios/codeact_chain")
+    fixture_root = _validate_fixture_root(repo_root / "tests/scenarios/codeact_chain")
     runtime_tasks = {
         task.round: _build_runtime_task(task, fixture_root)
         for task in tasks

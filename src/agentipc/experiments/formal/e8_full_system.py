@@ -88,14 +88,14 @@ def run_e8(
     git_sha = _read_git_sha(root)
 
     knowledge_tasks = load_knowledge_tasks(
-        root / "scenarios/knowledge_chain/tasks.json"
+        root / "tests/scenarios/knowledge_chain/tasks.json"
     )
     knowledge_base = [task for task in knowledge_tasks if 1 <= task.round <= 5]
     if [task.round for task in knowledge_base] != [1, 2, 3, 4, 5]:
         raise ValueError("E8 Knowledge workload requires rounds 1..5")
 
     documents = load_knowledge_documents(
-        root / "scenarios/knowledge_chain/knowledge"
+        root / "tests/scenarios/knowledge_chain/knowledge"
     )
     knowledge_data = [
         {
@@ -107,13 +107,13 @@ def run_e8(
     ]
 
     codeact_tasks = load_codeact_tasks(
-        root / "scenarios/codeact_chain/tasks.json"
+        root / "tests/scenarios/codeact_chain/tasks.json"
     )
     codeact_base = [task for task in codeact_tasks if 1 <= task.round <= 5]
     if [task.round for task in codeact_base] != [1, 2, 3, 4, 5]:
         raise ValueError("E8 CodeAct workload requires rounds 1..5")
 
-    fixture_root = _validate_fixture_root(root / "scenarios/codeact_chain")
+    fixture_root = _validate_fixture_root(root / "tests/scenarios/codeact_chain")
     codeact_runtime = {
         task.round: _build_runtime_task(task, fixture_root)
         for task in codeact_base

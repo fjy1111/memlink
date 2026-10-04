@@ -177,8 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scenario_parser.add_argument(
         "--scenario-root",
-        default="scenarios",
-        help="Root containing scenario fixtures (default: scenarios)",
+        default="tests/scenarios",
+        help="Root containing scenario fixtures (default: tests/scenarios)",
     )
 
     dashboard_parser = subparsers.add_parser(

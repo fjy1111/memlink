@@ -6,7 +6,14 @@ from pydantic import ValidationError
 from agentipc.config import AgentIPCConfig, load_config
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs" / "default.yaml"
+DEFAULT_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "agentipc"
+    / "resources"
+    / "configs"
+    / "default.yaml"
+)
 
 
 def test_default_config_constructs_with_expected_values() -> None:

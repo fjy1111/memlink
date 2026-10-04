@@ -35,7 +35,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：建立统一配置对象，不读取业务环境变量。
 - **Depends**：T000
-- **Allowed files**：`src/agentipc/config.py`, `configs/default.yaml`, `tests/test_config.py`
+- **Allowed files**：`src/agentipc/config.py`, `src/agentipc/resources/configs/default.yaml`, `tests/test_config.py`
 - **Do**：Pydantic 配置模型；state/memory/artifact/results 根目录；provider 默认值；随机种子。
 - **Do not**：不创建 provider。
 - **Acceptance**：`pytest -q tests/test_config.py`
@@ -836,7 +836,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：定义本地知识文档结构和 loader。
 - **Depends**：T082
-- **Allowed files**：`scenarios/knowledge_chain/knowledge/*.md`, `src/agentipc/scenarios/knowledge_loader.py`, `tests/scenarios/test_knowledge_loader.py`
+- **Allowed files**：`tests/scenarios/knowledge_chain/knowledge/*.md`, `src/agentipc/scenarios/knowledge_loader.py`, `tests/scenarios/test_knowledge_loader.py`
 - **Do**：先只放少量测试文档。
 - **Acceptance**：loader 可读取文档 ID/title/body/tags。
 
@@ -851,7 +851,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：编写前 5 轮原创任务与 expected evidence。
 - **Depends**：T140-T141
-- **Allowed files**：`scenarios/knowledge_chain/tasks.json`
+- **Allowed files**：`tests/scenarios/knowledge_chain/tasks.json`
 - **Do**：形成明确连续关系；后续问题复用前轮信息。
 - **Acceptance**：schema loader 成功；无代码修改。
 
@@ -859,7 +859,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：补齐 10 轮并增强跨任务复用点。
 - **Depends**：T142
-- **Allowed files**：`scenarios/knowledge_chain/tasks.json`
+- **Allowed files**：`tests/scenarios/knowledge_chain/tasks.json`
 - **Acceptance**：正好/至少 10 轮；存在可验证重复检索点。
 
 ## T144 — Knowledge task evaluator
@@ -900,7 +900,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：准备小型 CSV/JSON/log/config 输入文件。
 - **Depends**：无
-- **Allowed files**：`scenarios/codeact_chain/data/*`
+- **Allowed files**：`tests/scenarios/codeact_chain/data/*`
 - **Do**：原创小数据，无外部下载。
 - **Acceptance**：文件 UTF-8，体积小，可进 Git。
 
@@ -908,14 +908,14 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：设计前 5 轮，覆盖解析/过滤/聚合/配置计算。
 - **Depends**：T150-T151
-- **Allowed files**：`scenarios/codeact_chain/tasks.json`
+- **Allowed files**：`tests/scenarios/codeact_chain/tasks.json`
 - **Acceptance**：loader 成功，expected result 明确。
 
 ## T153 — CodeAct rounds 6-10
 
 - **Goal**：补齐 10 轮，加入可复用策略/中间结果。
 - **Depends**：T152
-- **Allowed files**：`scenarios/codeact_chain/tasks.json`
+- **Allowed files**：`tests/scenarios/codeact_chain/tasks.json`
 - **Acceptance**：至少两个任务可通过 Memory 减少重复计算。
 
 ## T154 — CodeAct evaluator
@@ -1031,28 +1031,28 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：单页 HTML + 原生 CSS/JS，显示 run 选择和基础信息。
 - **Depends**：T171
-- **Allowed files**：`dashboard/index.html`, `dashboard/app.js`, `dashboard/styles.css`
+- **Allowed files**：`src/agentipc/dashboard/static/index.html`, `src/agentipc/dashboard/static/app.js`, `src/agentipc/dashboard/static/styles.css`
 - **Acceptance**：不要求 Node/npm。
 
 ## T176 — A/B/C/D comparison view
 
 - **Goal**：展示消息、字符/token、时延、state、memory 指标对比。
 - **Depends**：T173, T175
-- **Allowed files**：`dashboard/app.js`, `dashboard/index.html`, `dashboard/styles.css`
+- **Allowed files**：`src/agentipc/dashboard/static/app.js`, `src/agentipc/dashboard/static/index.html`, `src/agentipc/dashboard/static/styles.css`
 - **Acceptance**：对 fixture summary 正确显示四配置。
 
 ## T177 — Agent timeline view
 
 - **Goal**：可视化 Planner->Retriever->Executor->Summarizer 事件。
 - **Depends**：T174-T175
-- **Allowed files**：`dashboard/app.js`, `dashboard/index.html`, `dashboard/styles.css`
+- **Allowed files**：`src/agentipc/dashboard/static/app.js`, `src/agentipc/dashboard/static/index.html`, `src/agentipc/dashboard/static/styles.css`
 - **Acceptance**：按 trace 顺序展示 sender/action/receiver。
 
 ## T178 — State and Memory view
 
 - **Goal**：显示 StateRef transport/bytes 与 Memory hits/used/effective。
 - **Depends**：T174-T175
-- **Allowed files**：`dashboard/app.js`, `dashboard/index.html`, `dashboard/styles.css`
+- **Allowed files**：`src/agentipc/dashboard/static/app.js`, `src/agentipc/dashboard/static/index.html`, `src/agentipc/dashboard/static/styles.css`
 - **Acceptance**：无数据时有空状态，不报 JS 错。
 
 ## T179 — `agentipc dashboard`
@@ -1084,7 +1084,7 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：创建 venv、安装 core/dev 依赖。
 - **Depends**：T000
-- **Allowed files**：`scripts/install.sh`
+- **Allowed files**：`demo/scripts/install.sh`
 - **Do**：不自动下载模型。
 - **Acceptance**：shellcheck 可选；至少在通用 Linux dry review 无明显 Bash 错误。
 
@@ -1092,35 +1092,35 @@ TODO/IMPLEMENTING -> BLOCKED
 
 - **Goal**：检查 `/etc/os-release`、Python、shared memory、SQLite。
 - **Depends**：T160
-- **Allowed files**：`scripts/check_openeuler.sh`
+- **Allowed files**：`demo/scripts/check_openeuler.sh`
 - **Acceptance**：非 openEuler 也能输出明确提示而非异常退出堆栈。
 
 ## T193 — Test wrapper script
 
 - **Goal**：统一执行核心测试并记录日志。
 - **Depends**：测试体系完成
-- **Allowed files**：`scripts/run_tests.sh`
+- **Allowed files**：`tests/scripts/run_tests.sh`
 - **Acceptance**：错误码透传。
 
 ## T194 — Benchmark wrapper script
 
 - **Goal**：运行正式 A/B/C/D benchmark 并打印结果路径。
 - **Depends**：T162
-- **Allowed files**：`scripts/run_benchmark.sh`
+- **Allowed files**：`tests/scripts/run_benchmark.sh`
 - **Acceptance**：provider/seed/repeat 可环境变量覆盖。
 
 ## T195 — openEuler verify script
 
 - **Goal**：串联 check/install 已完成环境后的 doctor/test/demo/smoke benchmark。
 - **Depends**：T191-T194, T164
-- **Allowed files**：`scripts/verify_openeuler.sh`
+- **Allowed files**：`demo/scripts/verify_openeuler.sh`
 - **Acceptance**：任一步失败返回非零；日志说明失败阶段。
 
 ## T196 — Wheel build smoke
 
 - **Goal**：验证 wheel build/install/import/CLI。
 - **Depends**：T164
-- **Allowed files**：`tests/packaging/test_package_metadata.py`, `scripts/package_smoke.sh`
+- **Allowed files**：`tests/packaging/test_package_metadata.py`, `demo/scripts/package_smoke.sh`
 - **Acceptance**：在新 venv 安装 wheel 后 `agentipc version` 成功。
 
 ---

@@ -467,7 +467,12 @@ def test_unknown_incomplete_invalid_and_scenario_runs_are_404(tmp_path: Path) ->
 
 def test_static_dashboard_files_are_served_and_root_contract_is_unchanged(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    client = TestClient(create_app(tmp_path / "results", static_dir=repo_root / "dashboard"))
+    client = TestClient(
+        create_app(
+            tmp_path / "results",
+            static_dir=repo_root / "src" / "agentipc" / "dashboard" / "static",
+        )
+    )
 
     for path in ["/dashboard/", "/dashboard/app.js", "/dashboard/styles.css"]:
         response = client.get(path)

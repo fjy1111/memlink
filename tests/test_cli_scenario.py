@@ -8,7 +8,7 @@ from agentipc.cli import main
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCENARIO_ROOT = PROJECT_ROOT / "scenarios"
+SCENARIO_ROOT = PROJECT_ROOT / "tests/scenarios"
 
 
 def _fail_connect(*args: object, **kwargs: object) -> None:

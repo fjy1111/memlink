@@ -14,7 +14,7 @@ from agentipc.scenarios.models import load_codeact_tasks
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CODEACT_ROOT = PROJECT_ROOT / "scenarios" / "codeact_chain"
+CODEACT_ROOT = PROJECT_ROOT / "tests/scenarios" / "codeact_chain"
 CODEACT_TASKS_PATH = CODEACT_ROOT / "tasks.json"
 
 

@@ -122,7 +122,7 @@ def _resolve_static_dir(static_dir: str | Path | None) -> Path | None:
             return None
         return candidate
 
-    source_candidate = Path(__file__).resolve().parents[3] / "dashboard"
+    source_candidate = Path(__file__).resolve().parent / "static"
     if source_candidate.exists() and source_candidate.is_dir():
         return source_candidate
 

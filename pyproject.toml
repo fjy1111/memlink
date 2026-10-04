@@ -43,7 +43,13 @@ where = ["src"]
 
 [tool.setuptools.data-files]
 "share/agentipc/dashboard" = [
-    "dashboard/index.html",
-    "dashboard/app.js",
-    "dashboard/styles.css",
+    "src/agentipc/dashboard/static/index.html",
+    "src/agentipc/dashboard/static/app.js",
+    "src/agentipc/dashboard/static/styles.css",
+]
+
+[tool.setuptools.package-data]
+agentipc = [
+    "dashboard/static/*",
+    "resources/configs/*",
 ]

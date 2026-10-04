@@ -9,8 +9,8 @@ from agentipc.scenarios.models import KnowledgeExpected, KnowledgeTask, ReuseHin
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REAL_TASKS_PATH = PROJECT_ROOT / "scenarios" / "knowledge_chain" / "tasks.json"
-REAL_KNOWLEDGE_ROOT = PROJECT_ROOT / "scenarios" / "knowledge_chain" / "knowledge"
+REAL_TASKS_PATH = PROJECT_ROOT / "tests/scenarios" / "knowledge_chain" / "tasks.json"
+REAL_KNOWLEDGE_ROOT = PROJECT_ROOT / "tests/scenarios" / "knowledge_chain" / "knowledge"
 
 
 def _valid_task_payload(*, round_number: int = 2) -> dict[str, object]:
