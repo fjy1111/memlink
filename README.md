@@ -184,8 +184,8 @@ Dashboard：
 ## 6. 获取代码
 
 ```bash
-git clone https://github.com/fjy1111/AgentIPC.git
-cd AgentIPC
+git clone https://github.com/fjy1111/memlink.git
+cd memlink
 git checkout master
 ```
 
