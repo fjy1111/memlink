@@ -15,9 +15,6 @@ Control Plane     AgentEnvelope + ArtifactRef
 State Plane       StateRef + SharedMemory
 Reuse Plane       MemoryService + Evaluator-Validated Fast Path
 ```
-
-参赛作品名称统一为 **memlink**。为保持已有工程兼容性，Python 包名、CLI 与环境变量前缀仍沿用早期工程名 `agentipc` / `AGENTIPC_*`。
-
 ---
 
 ## 1. 项目定位
